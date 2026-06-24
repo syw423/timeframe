@@ -1698,26 +1698,18 @@ if (backToBookshelfFromBookBtn) {
 }
 
 // ==============================
-// 书架：书籍生成 + 渲染
+// 书架：书籍生成 + 渲染（新版参考风格）
 // ==============================
-const BOOK_COLORS = [
-  ['#5a3a25', '#7a4a30'], // 棕
-  ['#3a4a3a', '#4a5a4a'], // 墨绿
-  ['#5a3030', '#7a4040'], // 砖红
-  ['#2a3a5a', '#3a4a7a'], // 深蓝
-  ['#4a3a5a', '#5a4a7a'], // 紫
-  ['#5a4a2a', '#7a5a3a'], // 金棕
-  ['#3a5a5a', '#4a6a6a'], // 青
-  ['#5a3a4a', '#6a4a5a'], // 玫
+const BOOK_CLASSES = [
+  'book-gold', 'book-teal', 'book-purple', 'book-deep-purple',
+  'book-navy', 'book-rose', 'book-forest', 'book-sky',
+  'book-orange', 'book-wine'
 ];
 
 function bookHash(s) {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h);
-}
-function bookHeight(count) {
-  return Math.min(200, 130 + Math.min(count, 25) * 3);
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({
@@ -1726,23 +1718,17 @@ function escapeHtml(s) {
 }
 
 function makeBook(name, count, opts = {}) {
-  const h = bookHeight(count);
-  const c = BOOK_COLORS[bookHash(name) % BOOK_COLORS.length];
-  const tilt = (bookHash(name + 'tilt') % 3) - 1;
-  const tiltClass = tilt < 0 ? 'tilt-l' : tilt > 0 ? 'tilt-r' : '';
-  const hasMark = (bookHash(name) % 3) === 0;
-  const markHtml = hasMark ? '<div class="book-mark"></div>' : '';
   const safeName = escapeHtml(name);
+  const colorClass = BOOK_CLASSES[bookHash(name) % BOOK_CLASSES.length];
+  const specialClass = opts.special || '';
   const action = opts.action || '';
+  const hasMark = (bookHash(name) % 4) === 0;
+  const markHtml = hasMark ? '<div class="bookmark"></div>' : '';
   return `
-    <div class="shelf-book ${opts.special || ''} ${tiltClass}" data-tag="${safeName}" data-count="${count}" data-action="${action}"
-         style="--h: ${h}px; --c1: ${c[0]}; --c2: ${c[1]};">
+    <div class="shelf-book ${colorClass} ${specialClass}" data-tag="${safeName}" data-count="${count}" data-action="${action}">
       ${markHtml}
-      <div class="book-spine">
-        <div class="book-title">${safeName}</div>
-        <div class="book-count">${count}</div>
-      </div>
-      <div class="book-pages"></div>
+      <div class="book-title">${safeName}</div>
+      <div class="book-count">${count}</div>
     </div>
   `;
 }
@@ -1753,10 +1739,7 @@ function monthToYear(monthName) {
   return m ? m[1] : null;
 }
 
-// 每层最多几本自定义标签的书
-const CUSTOM_TAGS_PER_SHELF = 8;
-
-// 外层书架：全部照片（金边）+ 年份 + 自定义标签（多层）
+// 外层书架：全部照片（金边）+ 年份 + 自定义标签
 async function buildOuterShelf() {
   const container = document.getElementById('outer-shelf-container');
   if (!container) return;
@@ -1773,12 +1756,14 @@ async function buildOuterShelf() {
     .filter(t => t.type === 'custom')
     .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
 
-  // 第一层：全部照片 + 年份（不滚动）
+  // 计算总照片数
   const allCount = allPhotoData.length;
+
+  // 第一组：全部照片 & 年份
   const html1 = [];
   if (allCount > 0) {
     html1.push(makeBook('全部照片', allCount, {
-      special: 'all-photos',
+      special: 'book-all',
       action: 'view-all'
     }));
   }
@@ -1794,36 +1779,42 @@ async function buildOuterShelf() {
       action: `view-year:${y}`
     }));
   }
+  let yearBookCount = (allCount > 0 ? 1 : 0) + years.length;
 
-  // 全部组装成 HTML：每层一个 .shelf
-  const shelves = [];
-  // 固定第一层：全部照片 & 年份
-  shelves.push(`<div class="shelf-board"></div>`);
-  shelves.push(`
-    <div class="shelf-label">📚 全部照片 & 年份</div>
-    <div class="shelf" data-shelf="1">${html1.join('')}</div>
+  // 第二组：自定义标签
+  const html2 = customTags.map(t => makeBook(t.name, t.count || 0, {
+    action: `view-tag:${t.name}`
+  }));
+
+  // 组装 HTML
+  const parts = [];
+
+  // Section 1: 全部照片 & 年份
+  const totalPhotos = allPhotoData.length;
+  parts.push(`
+    <div class="section-header">
+      <span class="section-title">� 全部照片 &amp; 年份</span>
+      <span class="section-count">${yearBookCount} 本 · ${totalPhotos} 张</span>
+    </div>
+    <div class="shelf">
+      <div class="shelf-inner">${html1.join('')}</div>
+    </div>
   `);
 
-  // 后续层：自定义标签（按 8 本分一层，无横向滚动）
-  if (customTags.length === 0) {
-    shelves.push(`<div class="shelf-board"></div>`);
-    shelves.push(`
-      <div class="shelf-label">🏷️ 自定义标签</div>
-      <div class="shelf" data-shelf="2"></div>
-    `);
-  } else {
-    shelves.push(`<div class="shelf-board"></div>`);
-    shelves.push(`<div class="shelf-label">🏷️ 自定义标签</div>`);
-    for (let i = 0; i < customTags.length; i += CUSTOM_TAGS_PER_SHELF) {
-      const chunk = customTags.slice(i, i + CUSTOM_TAGS_PER_SHELF);
-      const html = chunk.map(t => makeBook(t.name, t.count || 0, {
-        action: `view-tag:${t.name}`
-      })).join('');
-      shelves.push(`<div class="shelf" data-shelf="${2 + Math.floor(i / CUSTOM_TAGS_PER_SHELF)}">${html}</div>`);
-    }
-  }
+  // Section 2: 自定义标签
+  const customCount = customTags.length;
+  const totalCustomPhotos = customTags.reduce((s, t) => s + (t.count || 0), 0);
+  parts.push(`
+    <div class="section-header">
+      <span class="section-title">🏷️ 自定义标签</span>
+      <span class="section-count">${customCount} 个 · ${totalCustomPhotos} 张</span>
+    </div>
+    <div class="shelf">
+      <div class="shelf-inner">${html2.length ? html2.join('') : '<div style="color:var(--text-2);padding:20px;font-size:13px;">暂无自定义标签，请先在「分类」中创建</div>'}</div>
+    </div>
+  `);
 
-  container.innerHTML = shelves.join('');
+  container.innerHTML = parts.join('');
 
   // 暴露全局函数
   window.__bookViewAll = async () => {
@@ -1878,10 +1869,15 @@ async function buildInnerShelf(yearName) {
     });
   }).join('');
 
+  const totalMonthPhotos = months.reduce((s, t) => s + (t.count || 0), 0);
   container.innerHTML = `
-    <div class="shelf-board"></div>
-    <div class="shelf-label">🌙 月份</div>
-    <div class="shelf" data-shelf="1">${html}</div>
+    <div class="section-header">
+      <span class="section-title">🌙 月份</span>
+      <span class="section-count">${months.length} 个月 · ${totalMonthPhotos} 张</span>
+    </div>
+    <div class="shelf">
+      <div class="shelf-inner">${html || '<div style="color:var(--text-2);padding:20px;font-size:13px;">暂无月份相册</div>'}</div>
+    </div>
   `;
 
   container.onclick = (e) => {
