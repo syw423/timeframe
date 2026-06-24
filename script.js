@@ -1,7 +1,7 @@
 // ==============================
 // DOM 引用
 // ==============================
-import { saveToIndexedDB, loadFromIndexedDB, hasData, updateNote, deleteByFilename, generateMonthTag, createTag, addTagToPhotoByFile, repairTagCounts } from './src/db.js';
+import { saveToIndexedDB, loadFromIndexedDB, hasData, updateNote, deleteByFilename, generateMonthTag, createTag, addTagToPhotoByFile, repairTagCounts, getAllTags } from './src/db.js';
 import { calculateGridLayout } from './src/grid-layout.js';
 import { calculateCarouselLayout } from './src/carousel-layout.js';
 import { initThreeScene, destroyThreeScene, switchArrangement, getCurrentArrangement, ARRANGEMENTS } from './src/three-mode.js';
@@ -13,29 +13,36 @@ const folderInput = document.getElementById('folderInput');
 const fileInput = document.getElementById('fileInput');
 const statusDiv = document.getElementById('status');
 
-// 欢迎界面
-const welcomeImportBtn = document.getElementById('welcome-import-btn');
+// 三层页面
+const coverPage = document.getElementById('cover-page');
+const homePage = document.getElementById('home-page');
+const photosPage = document.getElementById('photos-page');
+
+// 主题切换
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+
+// 封面 / 主页
+const coverEnterBtn = document.getElementById('cover-enter-btn');
+const backToCoverBtn = document.getElementById('back-to-cover-btn');
+const dateSearchBtn = document.getElementById('date-search-btn');
+const backToHomeBtn = document.getElementById('back-to-home-btn');
+const zoneCards = document.querySelectorAll('.zone-card');
+const zonePhotosCount = document.getElementById('zone-photos-count');
+const zoneTagsCount = document.getElementById('zone-tags-count');
 
 // 导入选项弹窗
 const importModal = document.getElementById('import-modal');
 const importFolderOpt = document.getElementById('import-folder');
 const importFilesOpt = document.getElementById('import-files');
 
-// 顶部按钮
-const topBar = document.querySelector('.top-bar');
-const dateTrigger = document.getElementById('date-trigger');
-const addPhotosBtn = document.getElementById('add-photos-btn');
-
-// 布局切换
-const layoutGrid = document.getElementById('layout-grid');
-const layoutCarousel = document.getElementById('layout-carousel');
-const layoutCircle = null;
-const layoutThree = document.getElementById('layout-three');
-const layoutBook = document.getElementById('layout-book');
-
-// 排列切换栏
+// 顶部按钮（仅 photos-page）
+const topBar = document.querySelector('.photos-page .top-bar');
 const arrangementBar = document.getElementById('arrangement-bar');
 const arrBtns = arrangementBar?.querySelectorAll('.arr-btn') || [];
+
+// 布局切换（仅在浏览模式显示）
+const browseLayoutToggle = document.getElementById('browse-layout-toggle');
+const layoutBtns = browseLayoutToggle?.querySelectorAll('.layout-btn') || [];
 
 // 日期弹窗 + 日历
 const dateModal = document.getElementById('date-modal');
@@ -45,10 +52,6 @@ const calTitle = document.getElementById('cal-title');
 const calGrid = document.getElementById('cal-grid');
 const calPrev = document.getElementById('cal-prev');
 const calNext = document.getElementById('cal-next');
-
-// 导航标签
-const navPhotos = document.getElementById('nav-photos');
-const navTags = document.getElementById('nav-tags');
 
 // 标签容器
 const tagsHomeContainer = document.getElementById('tags-home-container');
@@ -85,6 +88,120 @@ let photoBlobUrls = [];
 let currentLayout = 'grid'; // 'grid' | 'carousel' | 'circle'
 
 // ==============================
+// 主题切换
+// ==============================
+function initTheme() {
+  const saved = localStorage.getItem('timeframe-theme') || 'dark';
+  document.body.dataset.theme = saved;
+}
+function toggleTheme() {
+  const next = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.body.dataset.theme = next;
+  localStorage.setItem('timeframe-theme', next);
+}
+initTheme();
+if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
+
+// ==============================
+// 页面切换
+// ==============================
+function showPage(pageEl) {
+  if (coverPage) coverPage.style.display = 'none';
+  if (homePage) homePage.style.display = 'none';
+  if (photosPage) photosPage.style.display = 'none';
+  if (pageEl) pageEl.style.display = '';
+}
+function showCover() {
+  showPage(coverPage);
+}
+function showHome() {
+  showPage(homePage);
+  if (tagsHomeContainer) tagsHomeContainer.style.display = 'none';
+  if (tagDetailContainer) tagDetailContainer.style.display = 'none';
+  updateHomeStats();
+}
+function showPhotos() {
+  showPage(photosPage);
+}
+
+// ==============================
+// 主页统计更新
+// ==============================
+async function updateHomeStats() {
+  if (zonePhotosCount) zonePhotosCount.textContent = allPhotoData.length;
+  if (zoneTagsCount) {
+    try {
+      const { getAllTags } = await import('./src/db.js');
+      const tags = await getAllTags();
+      zoneTagsCount.textContent = tags.filter(t => t.count > 0).length;
+    } catch (e) {
+      zoneTagsCount.textContent = '0';
+    }
+  }
+}
+
+// ==============================
+// 入口：封面 → 主页
+// ==============================
+if (coverEnterBtn) coverEnterBtn.addEventListener('click', showHome);
+if (backToCoverBtn) backToCoverBtn.addEventListener('click', showCover);
+if (backToHomeBtn) backToHomeBtn.addEventListener('click', () => {
+  // 隐藏浏览模式布局切换栏
+  if (browseLayoutToggle) browseLayoutToggle.style.display = 'none';
+
+  // 如果有标签筛选在生效，返回到对应的标签视图
+  if (currentTag && tagReturnView) {
+    window.returnToTagView();
+    return;
+  }
+
+  // 否则：返回主页
+  currentTag = null;
+  tagReturnView = null;
+  hideTagFilterBar();
+  if (tagsHomeContainer) tagsHomeContainer.style.display = 'none';
+  if (tagDetailContainer) tagDetailContainer.style.display = 'none';
+  showHome();
+  // 清理 3D 场景
+  try { destroyThreeScene(); } catch (e) {}
+  try { destroyBook(); } catch (e) {}
+});
+
+// 分区卡片点击
+zoneCards.forEach(card => {
+  card.addEventListener('click', () => {
+    const zone = card.dataset.zone;
+    if (zone === 'photos') {
+      // 照片管理模式隐藏浏览布局切换
+      if (browseLayoutToggle) browseLayoutToggle.style.display = 'none';
+      showPhotos();
+      if (allPhotoData.length > 0 && typeof selectDate === 'function') {
+        selectDate(currentDate || 'all').catch(e => console.error('[TimeFrame] 照片渲染失败:', e));
+      } else {
+        setText(statusDiv, '✨ 暂无照片，请先导入');
+      }
+    } else if (zone === 'tags') {
+      // 标签分类：隐藏浏览模式布局切换
+      if (browseLayoutToggle) browseLayoutToggle.style.display = 'none';
+      // 隐藏画廊，显示标签主页
+      showPhotos();
+      const gallery = document.getElementById('gallery-3d');
+      if (gallery) gallery.style.display = 'none';
+      setText(statusDiv, '🏷️ 标签分类管理');
+      tagsHomeContainer.style.display = 'block';
+      if (typeof renderTagsHome === 'function') {
+        renderTagsHome(tagsHomeContainer);
+      }
+    } else if (zone === 'browse') {
+      // 浏览模式：先弹出选择对话框
+      openBrowseModal();
+    } else if (zone === 'import') {
+      openImportModal();
+    }
+  });
+});
+
+// ==============================
 // 导入弹窗逻辑
 // ==============================
 function openImportModal() {
@@ -94,8 +211,6 @@ function closeImportModal() {
   if (importModal) importModal.classList.remove('open');
 }
 
-if (welcomeImportBtn) welcomeImportBtn.addEventListener('click', openImportModal);
-if (addPhotosBtn) addPhotosBtn.addEventListener('click', openImportModal);
 if (importModal) importModal.addEventListener('click', (e) => {
   if (e.target === importModal) closeImportModal();
 });
@@ -111,6 +226,128 @@ if (importFilesOpt) importFilesOpt.addEventListener('click', () => {
   closeImportModal();
   fileInput?.click();
 });
+
+// ==============================
+// 浏览模式选择
+// ==============================
+const browseModal = document.getElementById('browse-modal');
+const browseModalClose = document.getElementById('browse-modal-close');
+const browseOptionsContainer = document.getElementById('browse-options-container');
+
+async function openBrowseModal() {
+  if (!browseModal) return;
+
+  // 动态加载标签列表
+  let tags = [];
+  try {
+    tags = await getAllTags();
+  } catch (e) {
+    console.warn('[TimeFrame] 加载标签失败:', e);
+  }
+
+  // 分离自定义标签（按最后使用时间排序）
+  const customTags = tags
+    .filter(t => t.type === 'custom')
+    .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+
+  // 生成选项 HTML
+  const allPhotosCount = allPhotoData.length;
+  let optionsHtml = `
+    <div class="browse-option" data-mode="all" data-tag="">
+      <div class="browse-option-icon">🖼️</div>
+      <div>
+        <div class="browse-option-name">全部照片</div>
+        <div class="browse-option-desc">${allPhotosCount} 张照片</div>
+      </div>
+    </div>
+  `;
+
+  // 添加自定义标签选项
+  for (const tag of customTags) {
+    optionsHtml += `
+      <div class="browse-option" data-mode="tag" data-tag="${tag.name}">
+        <div class="browse-option-icon">🏷️</div>
+        <div>
+          <div class="browse-option-name">${tag.name}</div>
+          <div class="browse-option-desc">${tag.count || 0} 张照片</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 如果没有标签，显示提示
+  if (customTags.length === 0) {
+    optionsHtml += `
+      <div style="text-align:center;padding:20px;color:var(--text-2);font-size:13px;">
+        暂无自定义标签，请先在「分类」中创建
+      </div>
+    `;
+  }
+
+  browseOptionsContainer.innerHTML = optionsHtml;
+
+  // 绑定点击事件
+  browseOptionsContainer.querySelectorAll('.browse-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const mode = opt.dataset.mode;
+      const tagName = opt.dataset.tag;
+      closeBrowseModal();
+
+      // 显示 layout 切换栏并同步按钮状态
+      if (browseLayoutToggle) {
+        browseLayoutToggle.style.display = '';
+        // 同步布局按钮激活状态
+        layoutBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.layout === currentLayout));
+      }
+
+      if (mode === 'all') {
+        // 全部照片浏览 - 清除标签筛选
+        currentTag = null;
+        tagReturnView = null;
+        hideTagFilterBar();
+        showPhotos();
+        if (allPhotoData.length > 0 && typeof selectDate === 'function') {
+          selectDate(currentDate || 'all').catch(e => console.error(e));
+        }
+      } else if (mode === 'tag' && tagName) {
+        // 选择标签浏览 - 使用标签筛选
+        currentTag = tagName;
+        tagReturnView = null;
+        showPhotos();
+        // 显示标签筛选指示器
+        showTagFilterBar(tagName, null);
+        // 重新加载数据以确保 tags 同步
+        reloadPhotoTags().then(() => {
+          selectDate('all').catch(e => console.error('[TimeFrame] 标签筛选失败:', e));
+        });
+      }
+    });
+  });
+
+  browseModal.classList.add('open');
+}
+
+function closeBrowseModal() {
+  if (browseModal) browseModal.classList.remove('open');
+}
+if (browseModalClose) browseModalClose.addEventListener('click', closeBrowseModal);
+if (browseModal) browseModal.addEventListener('click', (e) => {
+  if (e.target === browseModal) closeBrowseModal();
+});
+
+// ==============================
+// 日期搜索按钮（主页/照片页通用）
+// ==============================
+if (dateSearchBtn) dateSearchBtn.addEventListener('click', () => {
+  openDateModal();
+});
+function openDateModal() {
+  if (dateModal) dateModal.classList.add('open');
+  if (typeof renderCalendar === 'function') renderCalendar();
+}
+function closeDateModal() {
+  if (dateModal) dateModal.classList.remove('open');
+}
 
 // ==============================
 // 通用照片处理（文件夹 + 单张）
@@ -190,8 +427,6 @@ async function processFiles(fileArray) {
 
     // 显示顶部按钮
     topBar?.classList.add('visible');
-    showResetButton();
-
     // 更新日历
     rebuildAvailableSet();
 
@@ -316,17 +551,13 @@ function renderCalendar() {
 
   calGrid.innerHTML = html;
 }
-
-function openDateModal() { addClass(dateModal, 'open'); renderCalendar(); }
-function closeDateModal() { removeClass(dateModal, 'open'); }
-
-if (dateTrigger) dateTrigger.addEventListener('click', openDateModal);
 if (dateModalClose) dateModalClose.addEventListener('click', closeDateModal);
 if (dateModal) dateModal.addEventListener('click', (e) => { if (e.target === dateModal) closeDateModal(); });
 
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (importModal?.classList.contains('open')) closeImportModal();
+  if (browseModal?.classList.contains('open')) closeBrowseModal();
+  else if (importModal?.classList.contains('open')) closeImportModal();
   else if (detailPanel?.classList.contains('open')) hidePhotoDetail();
   else if (dateModal?.classList.contains('open')) closeDateModal();
 });
@@ -664,9 +895,7 @@ function setLayout(mode) {
   currentLayout = mode;
 
   // 更新按钮状态
-  [layoutGrid, layoutCarousel, layoutCircle, layoutThree, layoutBook].forEach(btn => btn?.classList.remove('active'));
-  const btnMap = { grid: layoutGrid, carousel: layoutCarousel, three: layoutThree, book: layoutBook };
-  btnMap[mode]?.classList.add('active');
+  layoutBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.layout === mode));
 
   // 排列切换栏：仅 3D 模式显示
   if (arrangementBar) {
@@ -679,11 +908,12 @@ function setLayout(mode) {
   }
 }
 
-if (layoutGrid) layoutGrid.addEventListener('click', () => setLayout('grid'));
-if (layoutCarousel) layoutCarousel.addEventListener('click', () => setLayout('carousel'));
-if (layoutCircle) layoutCircle.addEventListener('click', () => setLayout('circle'));
-if (layoutThree) layoutThree.addEventListener('click', () => setLayout('three'));
-if (layoutBook) layoutBook.addEventListener('click', () => setLayout('book'));
+layoutBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.layout;
+    if (mode) setLayout(mode);
+  });
+});
 
 // 排列切换
 for (const btn of arrBtns) {
@@ -697,14 +927,9 @@ for (const btn of arrBtns) {
 }
 
 // ==============================
-// 导航切换（照片 / 分类）
+// 视图切换（照片 / 分类，仅在 photos-page 内部）
 // ==============================
 function switchView(view) {
-  // 更新按钮状态
-  [navPhotos, navTags].forEach(btn => btn?.classList.remove('active'));
-  if (view === 'photos') navPhotos?.classList.add('active');
-  else if (view === 'tags') navTags?.classList.add('active');
-
   // 隐藏所有容器
   const gallery = document.getElementById('gallery-3d');
   if (gallery) gallery.style.display = 'none';
@@ -727,12 +952,6 @@ function switchView(view) {
     }
   }
 }
-
-if (navPhotos) navPhotos.addEventListener('click', () => {
-  // 点击「所有照片」只切换到照片视图，不清除标签筛选
-  switchView('photos');
-});
-if (navTags) navTags.addEventListener('click', () => switchView('tags'));
 
 // ==============================
 // 标签筛选功能
@@ -807,9 +1026,6 @@ window.clearTagFilter = function() {
   if (tagsHomeContainer) tagsHomeContainer.style.display = 'none';
   if (tagDetailContainer) tagDetailContainer.style.display = 'none';
   addClass(pickerAll, 'active');
-  // 确保 nav-photos 高亮
-  if (navPhotos) navPhotos.classList.add('active');
-  if (navTags) navTags.classList.remove('active');
   selectDate('all').then(() => {
     setText(statusDiv, '✅ 已返回默认所有照片');
     setTimeout(() => {
@@ -840,32 +1056,14 @@ function showTagFilterBar(tagName, returnView) {
   const label = returnView === 'month-list' ? '返回月份' : (returnView === 'tags-home' ? '返回分类' : '退出');
 
   if (isReturnMode) {
-    tagFilterBarEl.innerHTML = `
-      <button class="tag-filter-back" id="tag-filter-back-btn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-        ${label}
-      </button>
-    `;
-    tagFilterBarEl.className = 'tag-filter-bar tag-filter-bar-back';
-    const backBtn = tagFilterBarEl.querySelector('#tag-filter-back-btn');
-    if (backBtn) {
-      backBtn.onclick = () => window.returnToTagView();
-    }
+    // tag-filter-bar 已废弃：返回操作改由 top-bar 的「返回主页」按钮处理
+    tagFilterBarEl.style.display = 'none';
+    return;
   } else {
-    tagFilterBarEl.innerHTML = `
-      <button class="tag-filter-clear" onclick="window.clearTagFilter()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-        ${label}
-      </button>
-    `;
-    tagFilterBarEl.className = 'tag-filter-bar';
+    // 兼容旧路径：不再显示退出按钮（清除筛选由返回主页完成）
+    tagFilterBarEl.style.display = 'none';
+    return;
   }
-  tagFilterBarEl.style.display = 'flex';
 }
 
 /**
@@ -1309,73 +1507,6 @@ function removeClass(el, cls) { if (el) el.classList.remove(cls); }
 // ==============================
 // 重置功能
 // ==============================
-async function resetApp() {
-  stopAutoRotate();
-  clearGalleryRing();
-
-  const { clearIndexedDB } = await import('./src/db.js');
-  await clearIndexedDB();
-
-  daysMap = {};
-  allPhotoData = [];
-  currentDate = 'all';
-  currentTag = null;
-  currentLayout = 'grid';
-  availableDatesSet = new Set();
-
-  topBar?.classList.remove('visible');
-  hideResetButton();
-
-  // 重置布局按钮状态
-  [layoutGrid, layoutCarousel, layoutCircle, layoutThree].forEach(btn => btn?.classList.remove('active'));
-  layoutGrid?.classList.add('active');
-
-  // 隐藏排列切换栏
-  if (arrangementBar) arrangementBar.style.display = 'none';
-
-  const welcome = document.getElementById('welcome');
-  if (welcome) welcome.classList.remove('hidden');
-
-  setText(statusDiv, '点击「导入照片」开始');
-
-  console.log('[TimeFrame] ✅ 已重置');
-}
-
-let resetBtnEl = null;
-function addResetButton() {
-  resetBtnEl = document.createElement('button');
-  resetBtnEl.id = 'reset-btn';
-  resetBtnEl.className = 'reset-btn';
-  resetBtnEl.innerHTML = `
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/>
-      <path d="M3 3v9h9"/>
-    </svg>
-    重置
-  `;
-  resetBtnEl.addEventListener('click', resetApp);
-  const topBar = document.querySelector('.top-bar');
-  if (topBar) {
-    topBar.insertBefore(resetBtnEl, topBar.firstChild);
-  } else {
-    document.body.appendChild(resetBtnEl);
-  }
-  // 初始时隐藏
-  resetBtnEl.style.display = 'none';
-}
-function showResetButton() {
-  if (resetBtnEl) {
-    resetBtnEl.style.display = '';
-    resetBtnEl.classList.add('visible');
-  }
-}
-function hideResetButton() {
-  if (resetBtnEl) {
-    resetBtnEl.style.display = 'none';
-    resetBtnEl.classList.remove('visible');
-  }
-}
-
 // ==============================
 // 从缓存恢复
 // ==============================
@@ -1427,12 +1558,12 @@ async function initFromCache() {
     if (welcome) welcome.classList.add('hidden');
 
     topBar?.classList.add('visible');
-    showResetButton();
     addClass(pickerAll, 'active');
     rebuildAvailableSet();
     await selectDate('all');
 
-    console.log(`[TimeFrame] ✅ 已从缓存恢复 ${allPhotoData.length} 张照片`);
+    console.log('[TimeFrame] ✅ 已从缓存恢复 ' + allPhotoData.length + ' 张照片');
+    console.log('[TimeFrame] 📊 currentDate =', currentDate, '| 首张照片:', allPhotoData[0]?.filename);
   } catch (e) {
     console.warn('[TimeFrame] 缓存加载失败:', e);
   }
@@ -1442,10 +1573,11 @@ async function initFromCache() {
 // 启动自检 + 初始化
 // ==============================
 (function selfTest() {
-  const ids = ['welcome','welcome-import-btn','import-modal','import-folder','import-files',
-    'folderInput','fileInput','add-photos-btn','date-trigger',
-    'nav-photos','nav-tags','tags-home-container','tag-detail-container',
-    'layout-grid','layout-carousel','layout-three','layout-book',
+  const ids = ['cover-page','home-page','photos-page',
+    'cover-enter-btn','back-to-cover-btn','back-to-home-btn','date-search-btn',
+    'theme-toggle-btn','import-modal','import-folder','import-files',
+    'folderInput','fileInput',
+    'tags-home-container','tag-detail-container',
     'arrangement-bar',
     'date-modal','date-modal-close',
     'cal-title','cal-grid','cal-prev','cal-next','picker-all',
@@ -1460,5 +1592,4 @@ async function initFromCache() {
 })();
 
 initFromCache();
-addResetButton();
 initTagManager();

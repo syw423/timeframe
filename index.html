@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Chrono — 时光相册</title>
+  <title>TimeFrame · 时光相册</title>
   <link rel="stylesheet" href="style.css?v=4">
   <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif-js.min.js"></script>
   <script type="importmap">
@@ -15,28 +15,159 @@
   }
   </script>
 </head>
-<body>
-  <!-- 欢迎界面 -->
-  <div id="welcome">
-    <div class="welcome-content">
-      <div class="welcome-header">
-        <div class="logo-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+<body data-theme="dark">
+  <!-- 主题切换按钮 -->
+  <button id="theme-toggle-btn" class="theme-toggle-btn" title="切换主题">
+    <span class="theme-icon-dark">🌙</span>
+    <span class="theme-icon-light">☀️</span>
+  </button>
+
+  <!-- ============================================
+       1. 封面（无导航栏）
+       ============================================ -->
+  <div id="cover-page" class="cover-page">
+    <div class="cover-bg"></div>
+    <div class="cover-content">
+      <div class="cover-tag">TIME FRAME</div>
+      <h1 class="cover-title">记忆之廊</h1>
+      <p class="cover-slogan">留住时光的每一帧</p>
+      <div class="cover-btn-group">
+        <button id="cover-enter-btn" class="btn-primary">
+          进入相册
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
           </svg>
-        </div>
-        <h1>我的相册</h1>
-        <p class="welcome-subtitle">导入照片，管理回忆</p>
-        <button id="welcome-import-btn" class="import-btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          导入照片
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- ============================================
+       2. 主页（分区卡片 + 日期搜索）
+       ============================================ -->
+  <div id="home-page" class="home-page" style="display:none">
+    <!-- 右上角日期搜索按钮 -->
+    <button id="date-search-btn" class="top-date-btn" title="按日期搜索">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      按日期搜索
+    </button>
+
+    <!-- 主页头部：返回封面 + 标题 -->
+    <header class="home-header">
+      <button id="back-to-cover-btn" class="btn-icon" title="返回封面">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <h1 class="home-title">TimeFrame</h1>
+      <div class="home-header-spacer"></div>
+    </header>
+
+    <!-- 分区卡片 -->
+    <div class="zone-grid">
+      <div class="zone-card" data-zone="photos">
+        <div>
+          <div class="zone-icon">📷</div>
+          <div class="zone-name">所有照片</div>
+          <div class="zone-desc">查看、导入、标签管理</div>
+        </div>
+        <div class="zone-stat"><span id="zone-photos-count">0</span> 张照片</div>
+      </div>
+
+      <div class="zone-card" data-zone="tags">
+        <div>
+          <div class="zone-icon">🏷️</div>
+          <div class="zone-name">分类</div>
+          <div class="zone-desc">按月份/自定义标签组织</div>
+        </div>
+        <div class="zone-stat"><span id="zone-tags-count">0</span> 个分类</div>
+      </div>
+
+      <div class="zone-card" data-zone="browse">
+        <div>
+          <div class="zone-icon">🌌</div>
+          <div class="zone-name">浏览模式</div>
+          <div class="zone-desc">沉浸式浏览 · 4 种布局</div>
+        </div>
+        <div class="zone-stat">网格 / 轮播 / 3D / 翻页书</div>
+      </div>
+
+      <div class="zone-card zone-card-import" data-zone="import">
+        <div>
+          <div class="zone-icon">⬆️</div>
+          <div class="zone-name">导入</div>
+          <div class="zone-desc">导入文件夹或选择照片</div>
+        </div>
+        <div class="zone-stat">点击导入</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       3. 照片视图（日常管理 + 浏览模式）
+       ============================================ -->
+  <div id="photos-page" class="photos-page" style="display:none">
+    <!-- 顶部工具栏 -->
+    <div class="top-bar">
+      <button id="back-to-home-btn" class="btn-icon" title="返回主页">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+
+      <div id="browse-layout-toggle" class="layout-toggle" style="display:none">
+        <button class="layout-btn active" data-layout="grid" title="网格">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+          </svg>
+        </button>
+        <button class="layout-btn" data-layout="carousel" title="轮播">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="1" y="4" width="22" height="16" rx="2"/>
+            <line x1="7" y1="4" x2="7" y2="20"/>
+            <line x1="17" y1="4" x2="17" y2="20"/>
+          </svg>
+        </button>
+        <button class="layout-btn" data-layout="three" title="3D">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2l9 5v10l-9 5-9-5V7l9-5z"/>
+            <path d="M12 12l8-4.5"/>
+            <path d="M12 12v10"/>
+            <path d="M4 7.5l8 4.5"/>
+          </svg>
+        </button>
+        <button class="layout-btn" data-layout="book" title="翻页书">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="arrangement-bar" class="arrangement-bar" style="display:none">
+        <button class="arr-btn active" data-arr="sphere">球体</button>
+        <button class="arr-btn" data-arr="helix">螺旋</button>
+        <button class="arr-btn" data-arr="cube">立方体</button>
+        <button class="arr-btn" data-arr="wave">波浪</button>
+      </div>
+
+      <div class="top-bar-spacer"></div>
+    </div>
+
+    <!-- 状态提示 -->
+    <div id="status">点击「导入」开始</div>
+
+    <!-- 3D 画廊容器 -->
+    <div id="gallery-3d"></div>
   </div>
 
   <!-- 导入选项弹窗 -->
@@ -60,84 +191,25 @@
     </div>
   </div>
 
+  <!-- 浏览模式选择弹窗 -->
+  <div id="browse-modal" class="browse-modal">
+    <div class="browse-modal-glass">
+      <button id="browse-modal-close" class="browse-modal-close btn-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <div class="browse-title">选择要浏览的内容</div>
+      <div class="browse-options" id="browse-options-container">
+        <!-- 由 script.js 动态填充 -->
+      </div>
+    </div>
+  </div>
+
   <!-- 隐藏的文件输入 -->
   <input type="file" id="folderInput" webkitdirectory multiple style="position:fixed;top:-1000px;left:-1000px;">
   <input type="file" id="fileInput" multiple accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/heic,video/mp4,video/quicktime,video/webm,video/x-msvideo" style="position:fixed;top:-1000px;left:-1000px;">
-
-  <!-- 顶部按钮 -->
-  <div class="top-bar">
-    <!-- 左侧导航栏 -->
-    <div class="nav-tabs">
-      <button id="nav-photos" class="nav-tab active">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-        所有照片
-      </button>
-      <button id="nav-tags" class="nav-tab">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-          <line x1="7" y1="7" x2="7.01" y2="7"/>
-        </svg>
-        分类
-      </button>
-      <button id="date-trigger" class="nav-tab">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
-        选择日期
-      </button>
-    </div>
-    <button id="add-photos-btn" class="top-btn">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19"/>
-        <line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      添加照片
-    </button>
-    <div class="layout-toggle">
-      <button id="layout-grid" class="layout-btn active" title="网格视图">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7"/>
-          <rect x="14" y="3" width="7" height="7"/>
-          <rect x="3" y="14" width="7" height="7"/>
-          <rect x="14" y="14" width="7" height="7"/>
-        </svg>
-      </button>
-      <button id="layout-carousel" class="layout-btn" title="轮播视图">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="1" y="4" width="22" height="16" rx="2"/>
-          <line x1="7" y1="4" x2="7" y2="20"/>
-          <line x1="17" y1="4" x2="17" y2="20"/>
-        </svg>
-      </button>
-      <button id="layout-three" class="layout-btn" title="3D 手势">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2l9 5v10l-9 5-9-5V7l9-5z"/>
-          <path d="M12 12l8-4.5"/>
-          <path d="M12 12v10"/>
-          <path d="M4 7.5l8 4.5"/>
-        </svg>
-      </button>
-      <button id="layout-book" class="layout-btn" title="翻页书">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
-        </svg>
-      </button>
-    </div>
-    <div id="arrangement-bar" class="arrangement-bar" style="display:none">
-      <button class="arr-btn active" data-arr="sphere">球体</button>
-      <button class="arr-btn" data-arr="helix">螺旋</button>
-      <button class="arr-btn" data-arr="cube">立方体</button>
-      <button class="arr-btn" data-arr="wave">波浪</button>
-    </div>
-  </div>
 
   <!-- 日期选择弹窗 -->
   <div id="date-modal" class="date-modal">
@@ -174,13 +246,7 @@
     </div>
   </div>
 
-  <!-- 状态提示 -->
-  <div id="status">点击「导入照片」开始</div>
-
-  <!-- CSS 3D 环形画廊容器 -->
-  <div id="gallery-3d"></div>
-
-  <!-- 标签主页容器 -->
+  <!-- 标签主页容器（直接作为 zone-card 子视图,不占据主页） -->
   <div id="tags-home-container" class="tags-home-container" style="display:none"></div>
 
   <!-- 标签详情页容器 -->

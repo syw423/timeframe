@@ -45,15 +45,13 @@ export async function renderTagsHome(container) {
       <div class="tags-header">
         <h2>标签分类</h2>
         <div class="tags-header-actions">
-          <button class="tag-exit-btn" id="tag-exit-btn" onclick="window.clearTagFilter()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-            退出
-          </button>
-          <button class="create-tag-btn" id="create-tag-btn">
+          <button class="btn-icon tag-back-btn" id="tag-back-home-btn" title="返回主页">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <button class="btn-secondary" id="create-tag-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
@@ -63,26 +61,21 @@ export async function renderTagsHome(container) {
       </div>
 
       ${systemTags.length > 0 ? `
-        <div class="tags-section">
-          <h3 class="tags-section-title">系统默认</h3>
-          <div class="tags-grid">
-            <div class="tag-card tag-card-folder" data-folder="month">
-              <div class="tag-card-icon">📅</div>
-              <div class="tag-card-info">
-                <div class="tag-card-name">月份</div>
-                <div class="tag-card-count">${systemTags.length} 个分类 · ${monthTotalCount} 张照片</div>
-              </div>
+        <div class="zone-grid">
+          <div class="zone-card tag-card tag-card-folder" data-folder="month">
+            <div>
+              <div class="zone-icon">📅</div>
+              <div class="zone-name">月份</div>
+              <div class="zone-desc">按拍摄月份自动分类</div>
             </div>
+            <div class="zone-stat">${systemTags.length} 个分类 · ${monthTotalCount} 张照片</div>
           </div>
         </div>
       ` : ''}
 
       ${customTags.length > 0 ? `
-        <div class="tags-section">
-          <h3 class="tags-section-title">用户自定义</h3>
-          <div class="tags-grid">
-            ${customTags.map(tag => renderTagCard(tag)).join('')}
-          </div>
+        <div class="zone-grid">
+          ${customTags.map(tag => renderTagCard(tag)).join('')}
         </div>
       ` : ''}
 
@@ -101,6 +94,14 @@ export async function renderTagsHome(container) {
   bindTagCardEvents(container, 'tags-home');
   bindCreateTagEvent(container);
 
+  // 绑定返回主页按钮
+  const backHomeBtn = container.querySelector('#tag-back-home-btn');
+  if (backHomeBtn) {
+    backHomeBtn.addEventListener('click', () => {
+      if (window.showHome) window.showHome();
+    });
+  }
+
   // 绑定月份文件夹点击事件
   const monthFolder = container.querySelector('.tag-card-folder[data-folder="month"]');
   if (monthFolder) {
@@ -117,20 +118,17 @@ function showMonthList(container, monthTags) {
   const html = `
     <div class="tags-home">
       <div class="tags-header">
-        <button class="tag-back-btn" id="tag-back-btn">
+        <button class="btn-icon tag-back-btn" id="tag-back-btn" title="返回">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
-          返回
         </button>
         <h2>月份分类</h2>
       </div>
 
       ${monthTags.length > 0 ? `
-        <div class="tags-section">
-          <div class="tags-grid">
-            ${monthTags.map(tag => renderTagCard(tag)).join('')}
-          </div>
+        <div class="zone-grid">
+          ${monthTags.map(tag => renderTagCard(tag)).join('')}
         </div>
       ` : `
         <div class="tags-empty">
@@ -166,22 +164,23 @@ function showMonthList(container, monthTags) {
 function renderTagCard(tag) {
   const isSystem = tag.type === 'system';
   return `
-    <div class="tag-card" data-tag="${tag.name}" data-type="${tag.type}">
-      <div class="tag-card-icon">
-        ${isSystem ? '📅' : '🏷️'}
+    <div class="zone-card tag-card" data-tag="${tag.name}" data-type="${tag.type}">
+      <div>
+        <div class="zone-icon">${isSystem ? '📅' : '🏷️'}</div>
+        <div class="zone-name">${tag.name}</div>
+        <div class="zone-desc">${isSystem ? '按月份自动分类' : '用户自定义标签'}</div>
       </div>
-      <div class="tag-card-info">
-        <div class="tag-card-name">${tag.name}</div>
-        <div class="tag-card-count">${tag.count || 0} 张照片</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="zone-stat">${tag.count || 0} 张照片</div>
+        ${!isSystem ? `
+          <button class="btn-icon tag-card-delete" data-tag="${tag.name}" title="删除标签" style="width:28px;height:28px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        ` : ''}
       </div>
-      ${!isSystem ? `
-        <button class="tag-card-delete" data-tag="${tag.name}" title="删除标签">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      ` : ''}
     </div>
   `;
 }
@@ -407,9 +406,9 @@ async function showTagSelector(filename, date, photoElement, x, y) {
   currentPhotoDate = date;
   currentPhotoElement = photoElement;
 
-  // 获取最近使用的标签和所有标签
-  const recentTags = await getRecentTags(5);
-  const allTags = await getAllTags();
+  // 获取最近使用的标签和所有标签（只显示自定义标签，不显示月份系统标签）
+  const recentTags = (await getRecentTags(5)).filter(t => t.type !== 'system');
+  const allTags = (await getAllTags()).filter(t => t.type !== 'system');
 
   // 合并：最近使用排在前面
   const recentTagNames = new Set(recentTags.map(t => t.name));
@@ -713,8 +712,9 @@ export async function renderPhotoDetailTags(container, photo, onUpdate) {
 }
 
 async function showTagSelectorForDetail(photo, container, onUpdate) {
-  const recentTags = await getRecentTags(5);
-  const allTags = await getAllTags();
+  // 只显示自定义标签，不显示月份系统标签
+  const recentTags = (await getRecentTags(5)).filter(t => t.type !== 'system');
+  const allTags = (await getAllTags()).filter(t => t.type !== 'system');
   const photoTags = photo.tags || [];
 
   // 合并：最近使用排在前面，并过滤掉照片已有标签
