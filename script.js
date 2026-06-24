@@ -167,6 +167,8 @@ async function updateHomeStats() {
     try {
       const { getAllTags } = await import('./src/db.js');
       const tags = await getAllTags();
+      // 缓存标签定义供各处使用
+      window.__allTagDefs = tags;
       zoneTagsCount.textContent = tags.filter(t => t.count > 0).length;
     } catch (e) {
       zoneTagsCount.textContent = '0';
@@ -846,7 +848,11 @@ function createCard(file, filename, date, note, url, width, height, tags) {
  * @param {Object} photo - 照片数据对象
  */
 function addTagBadge(card, photo) {
-  const tags = photo.tags || [];
+  const allTags = window.__allTagDefs || [];
+  const systemTagNames = new Set(
+    allTags.filter(t => t.type === 'system').map(t => t.name)
+  );
+  const tags = (photo.tags || []).filter(t => !systemTagNames.has(t));
   if (tags.length > 0) {
     const badge = document.createElement('div');
     badge.className = 'photo-tag-badge';

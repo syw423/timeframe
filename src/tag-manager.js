@@ -662,8 +662,12 @@ function showCreateTagDialog(filename = null, date = null) {
 export async function renderPhotoDetailTags(container, photo, onUpdate) {
   if (!container || !photo) return;
 
-  const tags = photo.tags || [];
   const allTags = await getAllTags();
+  // 系统月份标签不应显示在照片的标签列表中
+  const systemTagNames = new Set(
+    allTags.filter(t => t.type === 'system').map(t => t.name)
+  );
+  const tags = (photo.tags || []).filter(t => !systemTagNames.has(t));
 
   container.innerHTML = `
     <div class="detail-tags-section">
@@ -732,7 +736,7 @@ async function showTagSelectorForDetail(photo, container, onUpdate) {
       <div class="detail-tag-selector-section">
         ${sortedTags.map(tag => `
           <div class="detail-tag-selector-item" data-tag="${tag.name}">
-            ${tag.type === 'system' ? '📅' : '🏷️'} ${tag.name}
+            🏷️ ${tag.name}
           </div>
         `).join('')}
       </div>
