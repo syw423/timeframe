@@ -17,6 +17,10 @@ const statusDiv = document.getElementById('status');
 const coverPage = document.getElementById('cover-page');
 const homePage = document.getElementById('home-page');
 const photosPage = document.getElementById('photos-page');
+const browseHomePage = document.getElementById('browse-home-page');
+const bookshelfPage = document.getElementById('bookshelf-page');
+const innerBookshelfPage = document.getElementById('inner-bookshelf-page');
+const bookViewPage = document.getElementById('book-view-page');
 
 // 主题切换
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
@@ -109,6 +113,10 @@ function showPage(pageEl) {
   if (coverPage) coverPage.style.display = 'none';
   if (homePage) homePage.style.display = 'none';
   if (photosPage) photosPage.style.display = 'none';
+  if (browseHomePage) browseHomePage.style.display = 'none';
+  if (bookshelfPage) bookshelfPage.style.display = 'none';
+  if (innerBookshelfPage) innerBookshelfPage.style.display = 'none';
+  if (bookViewPage) bookViewPage.style.display = 'none';
   if (pageEl) pageEl.style.display = '';
 }
 function showCover() {
@@ -122,6 +130,32 @@ function showHome() {
 }
 function showPhotos() {
   showPage(photosPage);
+  // 浏览模式：隐藏布局切换栏和 arrangement 切换栏
+  if (browseLayoutToggle) browseLayoutToggle.style.display = 'none';
+  if (arrangementBar) arrangementBar.style.display = 'none';
+}
+function showBrowseHome() {
+  showPage(browseHomePage);
+  // 浏览模式主页：确保布局切换栏隐藏
+  if (browseLayoutToggle) browseLayoutToggle.style.display = 'none';
+  if (arrangementBar) arrangementBar.style.display = 'none';
+}
+function showBookshelf() {
+  showPage(bookshelfPage);
+  buildOuterShelf();
+}
+function showInnerBookshelf(yearName) {
+  showPage(innerBookshelfPage);
+  buildInnerShelf(yearName);
+}
+async function showBookView(tagName, data) {
+  showPage(bookViewPage);
+  const titleEl = document.getElementById('book-view-title');
+  if (titleEl) titleEl.textContent = '正在翻阅：' + tagName;
+  const container = document.getElementById('book-view-container');
+  if (container && typeof renderBook === 'function') {
+    renderBook(container, data);
+  }
 }
 
 // ==============================
@@ -172,7 +206,12 @@ zoneCards.forEach(card => {
   card.addEventListener('click', () => {
     const zone = card.dataset.zone;
     if (zone === 'photos') {
-      // 照片管理模式隐藏浏览布局切换
+      // 照片管理模式：默认网格布局 + 清除标签筛选
+      currentLayout = 'grid';
+      layoutBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.layout === 'grid'));
+      currentTag = null;
+      hideTagFilterBar();
+      // 隐藏浏览布局切换
       if (browseLayoutToggle) browseLayoutToggle.style.display = 'none';
       showPhotos();
       if (allPhotoData.length > 0 && typeof selectDate === 'function') {
@@ -181,9 +220,10 @@ zoneCards.forEach(card => {
         setText(statusDiv, '✨ 暂无照片，请先导入');
       }
     } else if (zone === 'tags') {
-      // 标签分类：隐藏浏览模式布局切换
+      // 标签分类：默认网格布局 + 隐藏画廊
+      currentLayout = 'grid';
+      layoutBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.layout === 'grid'));
       if (browseLayoutToggle) browseLayoutToggle.style.display = 'none';
-      // 隐藏画廊，显示标签主页
       showPhotos();
       const gallery = document.getElementById('gallery-3d');
       if (gallery) gallery.style.display = 'none';
@@ -193,8 +233,8 @@ zoneCards.forEach(card => {
         renderTagsHome(tagsHomeContainer);
       }
     } else if (zone === 'browse') {
-      // 浏览模式：先弹出选择对话框
-      openBrowseModal();
+      // 浏览模式：进入浏览模式主页（4 个布局卡片）
+      showBrowseHome();
     } else if (zone === 'import') {
       openImportModal();
     }
@@ -234,8 +274,12 @@ const browseModal = document.getElementById('browse-modal');
 const browseModalClose = document.getElementById('browse-modal-close');
 const browseOptionsContainer = document.getElementById('browse-options-container');
 
-async function openBrowseModal() {
+async function openBrowseModal(layoutOverride) {
   if (!browseModal) return;
+
+  // 当前选中的布局（来自浏览模式主页的 4 个卡片）
+  const layout = layoutOverride || currentLayout || 'grid';
+  const layoutNames = { grid: '网格', carousel: '横轴', three: '3D', book: '翻书' };
 
   // 动态加载标签列表
   let tags = [];
@@ -284,7 +328,14 @@ async function openBrowseModal() {
     `;
   }
 
+  // 在弹窗标题区域显示当前布局
   browseOptionsContainer.innerHTML = optionsHtml;
+
+  // 更新弹窗副标题显示当前布局
+  const browseSubtitle = document.getElementById('browse-subtitle');
+  if (browseSubtitle) {
+    browseSubtitle.innerHTML = `布局 <span class="browse-layout-pill">${layoutNames[layout] || '网格'}</span> · 选一个标签`;
+  }
 
   // 绑定点击事件
   browseOptionsContainer.querySelectorAll('.browse-option').forEach(opt => {
@@ -293,11 +344,17 @@ async function openBrowseModal() {
       const tagName = opt.dataset.tag;
       closeBrowseModal();
 
-      // 显示 layout 切换栏并同步按钮状态
+      // 设置当前布局
+      currentLayout = layout;
+      // 同步布局按钮激活状态
+      layoutBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.layout === currentLayout));
+
+      // 浏览模式：不显示布局切换栏（布局已在浏览模式主页选定）
       if (browseLayoutToggle) {
-        browseLayoutToggle.style.display = '';
-        // 同步布局按钮激活状态
-        layoutBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.layout === currentLayout));
+        browseLayoutToggle.style.display = 'none';
+      }
+      if (arrangementBar) {
+        arrangementBar.style.display = 'none';
       }
 
       if (mode === 'all') {
@@ -776,7 +833,7 @@ function createCard(file, filename, date, note, url, width, height, tags) {
     img.className = 'gallery-img';
     img.src = url;
     img.alt = file.name;
-    img.loading = 'lazy';
+    img.loading = 'eager';
     card.appendChild(img);
   }
 
@@ -876,7 +933,7 @@ function buildGridMode(photoData) {
       img.className = 'gallery-img';
       img.src = url;
       img.alt = filename;
-      img.loading = 'lazy';
+      img.loading = 'eager';
       card.appendChild(img);
     }
 
@@ -897,9 +954,9 @@ function setLayout(mode) {
   // 更新按钮状态
   layoutBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.layout === mode));
 
-  // 排列切换栏：仅 3D 模式显示
+  // 浏览模式下隐藏所有切换栏（布局已在浏览模式主页选定）
   if (arrangementBar) {
-    arrangementBar.style.display = mode === 'three' ? 'flex' : 'none';
+    arrangementBar.style.display = 'none';
   }
 
   // 重新渲染
@@ -1156,7 +1213,7 @@ function buildCarouselMode(photoData) {
       img.className = 'gallery-img';
       img.src = url;
       img.alt = filename;
-      img.loading = 'lazy';
+      img.loading = 'eager';
       card.appendChild(img);
     }
 
@@ -1573,17 +1630,23 @@ async function initFromCache() {
 // 启动自检 + 初始化
 // ==============================
 (function selfTest() {
-  const ids = ['cover-page','home-page','photos-page',
-    'cover-enter-btn','back-to-cover-btn','back-to-home-btn','date-search-btn',
+  const ids = ['cover-page','home-page','photos-page','browse-home-page',
+    'bookshelf-page','inner-bookshelf-page','book-view-page',
+    'cover-enter-btn','back-to-cover-btn','back-to-home-btn','back-to-home-from-browse','date-search-btn',
+    'back-to-browse-home','back-to-bookshelf','back-to-bookshelf-from-book',
+    'outer-shelf-container','inner-shelf-container',
+    'book-view-container','book-view-title',
     'theme-toggle-btn','import-modal','import-folder','import-files',
     'folderInput','fileInput',
     'tags-home-container','tag-detail-container',
     'arrangement-bar',
+    'browse-modal','browse-modal-close','browse-subtitle','browse-options-container',
     'date-modal','date-modal-close',
     'cal-title','cal-grid','cal-prev','cal-next','picker-all',
     'status','gallery-3d','photo-detail','detail-close','detail-img','detail-video',
     'detail-date','detail-note','detail-filename','detail-tags','detail-delete'];
   const missing = ids.filter(id => !document.getElementById(id));
+  console.log('[TimeFrame v2] selfTest: 检查', ids.length, '个 ID，缺失', missing.length, '个');
   if (missing.length) {
     console.error('[TimeFrame v2] ❌ 缺失 DOM 元素:', missing);
   } else {
@@ -1593,3 +1656,241 @@ async function initFromCache() {
 
 initFromCache();
 initTagManager();
+
+// ==============================
+// 浏览模式主页（4 个布局卡片 + 返回主页）
+// ==============================
+document.querySelectorAll('.browse-layout-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const layout = card.dataset.layout;
+    // 翻书布局：进入书架（不走标签选择弹窗）
+    if (layout === 'book') {
+      showBookshelf();
+      return;
+    }
+    openBrowseModal(layout);
+  });
+});
+
+const backToHomeFromBrowse = document.getElementById('back-to-home-from-browse');
+if (backToHomeFromBrowse) {
+  backToHomeFromBrowse.addEventListener('click', showHome);
+}
+
+// ==============================
+// 书架：返回按钮 + 书点击
+// ==============================
+const backToBrowseHomeBtn = document.getElementById('back-to-browse-home');
+if (backToBrowseHomeBtn) {
+  backToBrowseHomeBtn.addEventListener('click', showBrowseHome);
+}
+const backToBookshelfBtn = document.getElementById('back-to-bookshelf');
+if (backToBookshelfBtn) {
+  backToBookshelfBtn.addEventListener('click', showBookshelf);
+}
+const backToBookshelfFromBookBtn = document.getElementById('back-to-bookshelf-from-book');
+if (backToBookshelfFromBookBtn) {
+  backToBookshelfFromBookBtn.addEventListener('click', () => {
+    // 销毁 book
+    try { destroyBook(); } catch (e) {}
+    showBookshelf();
+  });
+}
+
+// ==============================
+// 书架：书籍生成 + 渲染
+// ==============================
+const BOOK_COLORS = [
+  ['#5a3a25', '#7a4a30'], // 棕
+  ['#3a4a3a', '#4a5a4a'], // 墨绿
+  ['#5a3030', '#7a4040'], // 砖红
+  ['#2a3a5a', '#3a4a7a'], // 深蓝
+  ['#4a3a5a', '#5a4a7a'], // 紫
+  ['#5a4a2a', '#7a5a3a'], // 金棕
+  ['#3a5a5a', '#4a6a6a'], // 青
+  ['#5a3a4a', '#6a4a5a'], // 玫
+];
+
+function bookHash(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+function bookHeight(count) {
+  return Math.min(200, 130 + Math.min(count, 25) * 3);
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+function makeBook(name, count, opts = {}) {
+  const h = bookHeight(count);
+  const c = BOOK_COLORS[bookHash(name) % BOOK_COLORS.length];
+  const tilt = (bookHash(name + 'tilt') % 3) - 1;
+  const tiltClass = tilt < 0 ? 'tilt-l' : tilt > 0 ? 'tilt-r' : '';
+  const hasMark = (bookHash(name) % 3) === 0;
+  const markHtml = hasMark ? '<div class="book-mark"></div>' : '';
+  const safeName = escapeHtml(name);
+  const action = opts.action || '';
+  return `
+    <div class="shelf-book ${opts.special || ''} ${tiltClass}" data-tag="${safeName}" data-count="${count}" data-action="${action}"
+         style="--h: ${h}px; --c1: ${c[0]}; --c2: ${c[1]};">
+      ${markHtml}
+      <div class="book-spine">
+        <div class="book-title">${safeName}</div>
+        <div class="book-count">${count}</div>
+      </div>
+      <div class="book-pages"></div>
+    </div>
+  `;
+}
+
+// 按月份名提取年份（如 "2026年3月" → "2026"）
+function monthToYear(monthName) {
+  const m = String(monthName).match(/(\d{4})/);
+  return m ? m[1] : null;
+}
+
+// 每层最多几本自定义标签的书
+const CUSTOM_TAGS_PER_SHELF = 8;
+
+// 外层书架：全部照片（金边）+ 年份 + 自定义标签（多层）
+async function buildOuterShelf() {
+  const container = document.getElementById('outer-shelf-container');
+  if (!container) return;
+
+  // 加载标签
+  let tags = [];
+  try {
+    tags = await getAllTags();
+  } catch (e) {
+    console.warn('[Bookshelf] 加载标签失败:', e);
+  }
+  const systemMonths = tags.filter(t => t.type === 'system');
+  const customTags = tags
+    .filter(t => t.type === 'custom')
+    .sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+
+  // 第一层：全部照片 + 年份（不滚动）
+  const allCount = allPhotoData.length;
+  const html1 = [];
+  if (allCount > 0) {
+    html1.push(makeBook('全部照片', allCount, {
+      special: 'all-photos',
+      action: 'view-all'
+    }));
+  }
+  const yearMap = new Map();
+  for (const t of systemMonths) {
+    const y = monthToYear(t.name);
+    if (!y) continue;
+    yearMap.set(y, (yearMap.get(y) || 0) + (t.count || 0));
+  }
+  const years = [...yearMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  for (const [y, cnt] of years) {
+    html1.push(makeBook(y + ' 年', cnt, {
+      action: `view-year:${y}`
+    }));
+  }
+
+  // 全部组装成 HTML：每层一个 .shelf
+  const shelves = [];
+  // 固定第一层：全部照片 & 年份
+  shelves.push(`<div class="shelf-board"></div>`);
+  shelves.push(`
+    <div class="shelf-label">📚 全部照片 & 年份</div>
+    <div class="shelf" data-shelf="1">${html1.join('')}</div>
+  `);
+
+  // 后续层：自定义标签（按 8 本分一层，无横向滚动）
+  if (customTags.length === 0) {
+    shelves.push(`<div class="shelf-board"></div>`);
+    shelves.push(`
+      <div class="shelf-label">🏷️ 自定义标签</div>
+      <div class="shelf" data-shelf="2"></div>
+    `);
+  } else {
+    shelves.push(`<div class="shelf-board"></div>`);
+    shelves.push(`<div class="shelf-label">🏷️ 自定义标签</div>`);
+    for (let i = 0; i < customTags.length; i += CUSTOM_TAGS_PER_SHELF) {
+      const chunk = customTags.slice(i, i + CUSTOM_TAGS_PER_SHELF);
+      const html = chunk.map(t => makeBook(t.name, t.count || 0, {
+        action: `view-tag:${t.name}`
+      })).join('');
+      shelves.push(`<div class="shelf" data-shelf="${2 + Math.floor(i / CUSTOM_TAGS_PER_SHELF)}">${html}</div>`);
+    }
+  }
+
+  container.innerHTML = shelves.join('');
+
+  // 暴露全局函数
+  window.__bookViewAll = async () => {
+    const photos = allPhotoData.map(p => ({ ...p }));
+    showBookView('全部照片', photos);
+  };
+  window.__bookViewTag = async (tagName) => {
+    const photos = allPhotoData.filter(p => (p.tags || []).includes(tagName))
+      .map(p => ({ ...p }));
+    showBookView(tagName, photos);
+  };
+  window.__openInnerShelf = (year) => {
+    showInnerBookshelf(year);
+  };
+
+  // 事件委托
+  container.onclick = (e) => {
+    const bookEl = e.target.closest('.shelf-book');
+    if (!bookEl) return;
+    const action = bookEl.dataset.action;
+    if (!action) return;
+    if (action === 'view-all') {
+      window.__bookViewAll();
+    } else if (action.startsWith('view-year:')) {
+      window.__openInnerShelf(action.slice(10));
+    } else if (action.startsWith('view-tag:')) {
+      window.__bookViewTag(action.slice(9));
+    }
+  };
+}
+
+// 内层书架：某年的月份
+async function buildInnerShelf(yearName) {
+  const titleEl = document.getElementById('inner-shelf-title');
+  if (titleEl) titleEl.textContent = yearName + ' 年的回忆';
+
+  const container = document.getElementById('inner-shelf-container');
+  if (!container) return;
+
+  let tags = [];
+  try {
+    tags = await getAllTags();
+  } catch (e) {}
+  const months = tags
+    .filter(t => t.type === 'system' && monthToYear(t.name) === yearName)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const html = months.map(t => {
+    const displayName = t.name.replace(/\d{4}年/, ''); // "2026年3月" → "3月"
+    return makeBook(displayName, t.count || 0, {
+      action: `view-tag:${t.name}`
+    });
+  }).join('');
+
+  container.innerHTML = `
+    <div class="shelf-board"></div>
+    <div class="shelf-label">🌙 月份</div>
+    <div class="shelf" data-shelf="1">${html}</div>
+  `;
+
+  container.onclick = (e) => {
+    const bookEl = e.target.closest('.shelf-book');
+    if (!bookEl) return;
+    const action = bookEl.dataset.action;
+    if (!action) return;
+    if (action.startsWith('view-tag:')) {
+      window.__bookViewTag(action.slice(9));
+    }
+  };
+}

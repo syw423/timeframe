@@ -110,7 +110,116 @@
   </div>
 
   <!-- ============================================
-       3. 照片视图（日常管理 + 浏览模式）
+       3. 浏览模式主页（4 个布局卡片 - 像主页一样的布局）
+       ============================================ -->
+  <div id="browse-home-page" class="browse-home-page" style="display:none">
+    <button id="back-to-home-from-browse" class="btn-icon browse-home-back" title="返回主页">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+
+    <header class="browse-home-header">
+      <h1 class="browse-home-title">浏览模式</h1>
+      <p class="browse-home-subtitle">选择一种浏览方式</p>
+    </header>
+
+    <div class="browse-home-grid">
+      <div class="browse-layout-card" data-layout="grid">
+        <div class="blc-preview blc-preview-grid">
+          <div></div><div></div><div></div>
+          <div></div><div></div><div></div>
+          <div></div><div></div><div></div>
+        </div>
+        <div class="blc-name">网格</div>
+        <div class="blc-desc">整齐排列 · 适合概览</div>
+      </div>
+
+      <div class="browse-layout-card" data-layout="carousel">
+        <div class="blc-preview blc-preview-carousel">
+          <div></div><div></div><div></div>
+          <div></div><div></div>
+        </div>
+        <div class="blc-name">横轴</div>
+        <div class="blc-desc">水平滑动 · 适合浏览</div>
+      </div>
+
+      <div class="browse-layout-card" data-layout="three">
+        <div class="blc-preview blc-preview-three">
+          <div></div><div></div><div></div>
+          <div></div><div></div><div></div>
+        </div>
+        <div class="blc-name">3D</div>
+        <div class="blc-desc">立体旋转 · 沉浸式</div>
+      </div>
+
+      <div class="browse-layout-card" data-layout="book" id="book-layout-card">
+        <div class="blc-preview blc-preview-book">
+          <div></div>
+        </div>
+        <div class="blc-name">翻书</div>
+        <div class="blc-desc">书架选择 · 翻页浏览</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================
+       3. 书架外层（全部照片 + 年份 + 自定义标签）
+       ============================================ -->
+  <div id="bookshelf-page" class="bookshelf-page" style="display:none">
+    <button id="back-to-browse-home" class="btn-icon bookshelf-back" title="返回浏览模式">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+
+    <header class="bookshelf-header">
+      <h1>回忆书房</h1>
+      <p>选一本相册 · 翻开一段时光</p>
+    </header>
+
+    <div class="shelves" id="outer-shelf-container">
+      <!-- 由 buildOuterShelf 动态填充 -->
+    </div>
+  </div>
+
+  <!-- ============================================
+       3b. 书架内层（某年内的月份书）
+       ============================================ -->
+  <div id="inner-bookshelf-page" class="bookshelf-page" style="display:none">
+    <button id="back-to-bookshelf" class="btn-icon bookshelf-back" title="返回书架">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+
+    <header class="bookshelf-header">
+      <h1 id="inner-shelf-title">2026 年的回忆</h1>
+      <p>选一个月 · 翻开相册</p>
+    </header>
+
+    <div class="shelves" id="inner-shelf-container">
+      <!-- 由 buildInnerShelf 动态填充 -->
+    </div>
+  </div>
+
+  <!-- ============================================
+       3c. 翻书视图
+       ============================================ -->
+  <div id="book-view-page" class="book-view-page" style="display:none">
+    <button id="back-to-bookshelf-from-book" class="btn-icon bookshelf-back" title="返回书架">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <header class="bookshelf-header">
+      <h1 id="book-view-title">正在翻阅</h1>
+    </header>
+    <div id="book-view-container" class="book-view-container"></div>
+  </div>
+
+  <!-- ============================================
+       4. 照片视图（日常管理 + 浏览模式）
        ============================================ -->
   <div id="photos-page" class="photos-page" style="display:none">
     <!-- 顶部工具栏 -->
@@ -201,6 +310,7 @@
         </svg>
       </button>
       <div class="browse-title">选择要浏览的内容</div>
+      <div class="browse-subtitle" id="browse-subtitle">选一个标签</div>
       <div class="browse-options" id="browse-options-container">
         <!-- 由 script.js 动态填充 -->
       </div>

@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TimeFrame v2 · 视觉风格预览</title>
+<style>
+/* ==============================
+   基础重置
+   ============================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a0f;
+  --bg-2: #12121a;
+  --bg-3: #1a1a24;
+  --text: #f0ece4;
+  --text-2: #a8a29e;
+  --text-3: #6b6b6b;
+  --accent: #c9b99a;
+  --accent-warm: #e8d5b7;
+  --accent-glow: rgba(201, 185, 154, 0.4);
+  --accent-soft: rgba(201, 185, 154, 0.08);
+  --accent-border: rgba(201, 185, 154, 0.2);
+  --danger: #f85149;
+  --success: #7ee787;
+  --info: #79c0ff;
+  --border: rgba(255,255,255,0.08);
+  --glass: rgba(20, 20, 30, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.06);
+}
+[data-theme="light"] {
+  --bg: #fafaf7;
+  --bg-2: #ffffff;
+  --bg-3: #f4f2ec;
+  --text: #1a1a1a;
+  --text-2: #555;
+  --text-3: #999;
+  --accent: #a08055;
+  --accent-warm: #c9b99a;
+  --accent-glow: rgba(160, 128, 85, 0.3);
+  --accent-soft: rgba(160, 128, 85, 0.08);
+  --accent-border: rgba(160, 128, 85, 0.25);
+  --danger: #d32f2f;
+  --border: rgba(0,0,0,0.08);
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.06);
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.4s ease, color 0.4s ease;
+}
+
+/* ==============================
+   背景层
+   ============================== */
+.bg-layer {
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse at 20% 80%, var(--accent-soft) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, var(--accent-soft) 0%, transparent 50%),
+    var(--bg);
+  pointer-events: none;
+}
+.theme-toggle {
+  position: fixed; top: 24px; right: 24px; z-index: 100;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  backdrop-filter: blur(20px);
+  cursor: pointer;
+  font-size: 12px; color: var(--text-2);
+  transition: all 0.2s;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--accent-border); }
+
+/* ==============================
+   顶部导航
+   ============================== */
+.top-bar {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 50;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.nav-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 18px;
+  font-size: 13px; font-weight: 500;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.nav-tab:hover { color: var(--text); background: var(--accent-soft); }
+.nav-tab.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+.nav-search {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.nav-search:hover { color: var(--text); border-color: var(--accent-border); }
+
+/* ==============================
+   区域标题
+   ============================== */
+.section {
+  position: relative; z-index: 2;
+  max-width: 1200px; margin: 0 auto;
+  padding: 120px 32px 60px;
+}
+.section-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+.section-tag {
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.5em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.section-title {
+  font-size: 36px; font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.section-desc {
+  font-size: 14px;
+  color: var(--text-2);
+  letter-spacing: 0.05em;
+}
+
+/* ==============================
+   1. 封面预览
+   ============================== */
+.cover-preview {
+  height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+.cover-tag {
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.5em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+.cover-title {
+  font-size: clamp(3.5rem, 10vw, 6rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.1;
+  background: linear-gradient(135deg, var(--text) 0%, var(--accent) 60%, var(--accent-warm) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 24px;
+}
+.cover-slogan {
+  font-size: 16px;
+  color: var(--text-2);
+  letter-spacing: 0.3em;
+  margin-bottom: 48px;
+}
+.cover-btn-group {
+  display: flex; gap: 16px; align-items: center;
+}
+.cover-version {
+  position: absolute; bottom: 32px;
+  font-size: 11px; color: var(--text-3);
+  letter-spacing: 0.2em;
+}
+
+/* ==============================
+   2. 主页分区预览
+   ============================== */
+.zone-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 60px;
+}
+.zone-card {
+  position: relative;
+  padding: 32px 24px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  min-height: 200px;
+  display: flex; flex-direction: column;
+  justify-content: space-between;
+}
+.zone-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.zone-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-border);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+}
+.zone-card:hover::before { opacity: 1; }
+
+/* 新建标签卡片 */
+.zone-card.tag-card-create {
+  border-style: dashed;
+  border-color: var(--accent-border);
+  background: transparent;
+}
+.zone-card.tag-card-create .zone-icon {
+  background: transparent;
+  color: var(--accent);
+  border: 1px dashed var(--accent-border);
+  font-size: 28px;
+  font-weight: 300;
+}
+.zone-card.tag-card-create .zone-name { color: var(--accent); }
+.zone-icon {
+  width: 48px; height: 48px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.zone-name {
+  font-size: 18px; font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.zone-desc {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.zone-stat {
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+
+/* ==============================
+   3. 浏览模式卡片
+   ============================== */
+.view-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.view-mode-card {
+  padding: 20px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.view-mode-card:hover {
+  border-color: var(--accent-border);
+  transform: translateY(-2px);
+}
+.view-mode-thumb {
+  width: 100%;
+  height: 100px;
+  background: var(--bg-3);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  color: var(--accent);
+}
+.view-mode-name {
+  font-size: 13px; font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.view-mode-desc {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* ==============================
+   4. 照片网格预览
+   ============================== */
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.photo-card {
+  aspect-ratio: 1;
+  background: var(--bg-3);
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.photo-card:hover { transform: scale(1.02); }
+.photo-card::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.4));
+  pointer-events: none;
+}
+.photo-card .photo-label {
+  position: absolute; bottom: 12px; left: 12px;
+  z-index: 2;
+  font-size: 11px;
+  color: rgba(255,255,255,0.9);
+  letter-spacing: 0.1em;
+}
+
+/* ==============================
+   5. 按钮设计系统
+   ============================== */
+.btn-showcase {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.btn-cell {
+  padding: 24px 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  text-align: center;
+  backdrop-filter: blur(20px);
+}
+.btn-cell-label {
+  font-size: 11px;
+  color: var(--text-3);
+  letter-spacing: 0.1em;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+}
+
+/* 主按钮 */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  font-size: 13px; font-weight: 600;
+  color: var(--bg);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-warm) 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px var(--accent-glow);
+  letter-spacing: 0.05em;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px var(--accent-glow);
+}
+
+/* 次按钮 */
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  font-size: 13px; font-weight: 500;
+  color: var(--text);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+.btn-secondary:hover {
+  background: rgba(201, 185, 154, 0.15);
+  border-color: var(--accent);
+}
+
+/* 图标按钮 */
+.btn-icon {
+  width: 40px; height: 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-icon:hover {
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+/* 文字按钮 */
+.btn-text {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--accent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-text:hover { opacity: 0.7; }
+
+/* 危险按钮 */
+.btn-danger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px;
+  padding: 0 24px;
+  font-size: 13px; font-weight: 500;
+  color: var(--danger);
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-danger:hover {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: var(--danger);
+}
+
+/* ==============================
+   6. 标签卡片预览
+   ============================== */
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.tag-card-preview {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tag-card-preview:hover { border-color: var(--accent-border); }
+.tag-card-icon {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  font-size: 16px;
+}
+.tag-card-info { flex: 1; }
+.tag-card-name {
+  font-size: 13px; font-weight: 500;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.tag-card-count {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* ==============================
+   7. 排版对照
+   ============================== */
+.typo-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.typo-label {
+  font-size: 12px;
+  color: var(--text-3);
+  letter-spacing: 0.1em;
+  width: 120px;
+}
+.typo-sample { flex: 1; text-align: right; }
+.typo-h1 { font-size: 32px; font-weight: 700; color: var(--text); letter-spacing: 0.05em; }
+.typo-h2 { font-size: 24px; font-weight: 600; color: var(--text); letter-spacing: 0.05em; }
+.typo-h3 { font-size: 18px; font-weight: 600; color: var(--text); }
+.typo-body { font-size: 14px; color: var(--text-2); }
+.typo-caption { font-size: 12px; color: var(--text-3); letter-spacing: 0.1em; }
+.typo-tag-text { font-size: 11px; color: var(--accent); letter-spacing: 0.5em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<!-- 背景层 -->
+<div class="bg-layer"></div>
+
+<!-- 主题切换 -->
+<button class="theme-toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'light' ? '' : 'light'">
+  <span id="theme-icon">☀️</span>
+  <span id="theme-label">浅色</span>
+</button>
+
+<!-- 滚动指示 -->
+<style>
+  .cover-only { display: block; }
+  .home-only { display: none; }
+  .simulate-home .cover-only { display: none; }
+  .simulate-home .home-only { display: block; }
+  .scroll-hint {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    z-index: 100; padding: 10px 20px;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: 999px; backdrop-filter: blur(20px);
+    font-size: 12px; color: var(--text-2);
+    letter-spacing: 0.1em; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .scroll-hint:hover { color: var(--accent); border-color: var(--accent-border); }
+
+/* 顶部日期搜索按钮 */
+.top-date-btn {
+  position: fixed; top: 20px; right: 130px; z-index: 60;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 13px; font-weight: 500;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+.top-date-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+</style>
+
+<!-- ============================================
+     1. 封面预览（无导航栏）
+     ============================================ -->
+<section class="cover-preview cover-only">
+  <div class="cover-tag">TIME FRAME</div>
+  <h1 class="cover-title">记忆之廊</h1>
+  <p class="cover-slogan">留住时光的每一帧</p>
+  <div class="cover-btn-group">
+    <button class="btn-primary" onclick="document.body.classList.add('simulate-home')">进入相册 →</button>
+    <button class="btn-secondary">了解更多</button>
+  </div>
+  <div class="cover-version">v2.0 · TimeFrame</div>
+</section>
+
+<button class="scroll-hint cover-only" onclick="document.body.classList.add('simulate-home')">↓ 模拟进入相册后</button>
+
+<!-- 顶部日期搜索按钮（仅主页显示,除浏览模式外可用） -->
+<button class="top-date-btn home-only" id="top-date-btn" onclick="alert('弹出日期选择器')">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+    <line x1="16" y1="2" x2="16" y2="6"/>
+    <line x1="8" y1="2" x2="8" y2="6"/>
+    <line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+  按日期搜索
+</button>
+
+<button class="scroll-hint home-only" onclick="document.body.classList.remove('simulate-home')">↑ 返回封面</button>
+
+<!-- ============================================
+     2. 主页分区预览
+     ============================================ -->
+<section class="section">
+  <div class="section-header">
+    <div class="section-tag">HOME</div>
+    <h2 class="section-title">分区主页</h2>
+    <p class="section-desc">封面后多一个分区选择页,主区域根据导航切换</p>
+  </div>
+
+  <div class="zone-grid">
+    <div class="zone-card">
+      <div>
+        <div class="zone-icon">📷</div>
+        <div class="zone-name">所有照片</div>
+        <div class="zone-desc">网格视图,适合日常查看、导入、标签管理</div>
+      </div>
+      <div class="zone-stat">28 张照片</div>
+    </div>
+
+    <div class="zone-card">
+      <div>
+        <div class="zone-icon">🌌</div>
+        <div class="zone-name">浏览模式</div>
+        <div class="zone-desc">沉浸式浏览,适合回忆和展示</div>
+      </div>
+      <div class="zone-stat">5 种布局可选</div>
+    </div>
+
+    <div class="zone-card">
+      <div>
+        <div class="zone-icon">🏷️</div>
+        <div class="zone-name">分类</div>
+        <div class="zone-desc">按月份/自定义标签组织照片</div>
+      </div>
+      <div class="zone-stat">3 个分类</div>
+    </div>
+  </div>
+
+  <!-- 浏览模式布局选项 -->
+  <div class="section-header" style="margin-top: 60px;">
+    <div class="section-tag">VIEW MODES</div>
+    <h2 class="section-title">浏览模式 · 5 种布局</h2>
+    <p class="section-desc">独立于日常模式,沉浸式浏览</p>
+  </div>
+
+  <div class="view-mode-grid">
+    <div class="view-mode-card">
+      <div class="view-mode-thumb">▦</div>
+      <div class="view-mode-name">网格</div>
+      <div class="view-mode-desc">日常查看</div>
+    </div>
+    <div class="view-mode-card">
+      <div class="view-mode-thumb">◐</div>
+      <div class="view-mode-name">轮播</div>
+      <div class="view-mode-desc">横向滑动</div>
+    </div>
+    <div class="view-mode-card">
+      <div class="view-mode-thumb">◎</div>
+      <div class="view-mode-name">3D 球面</div>
+      <div class="view-mode-desc">立体旋转</div>
+    </div>
+    <div class="view-mode-card">
+      <div class="view-mode-thumb">📖</div>
+      <div class="view-mode-name">翻页书</div>
+      <div class="view-mode-desc">模拟书页</div>
+    </div>
+  </div>
+
+  <!-- 照片网格预览 -->
+  <div class="section-header" style="margin-top: 60px;">
+    <div class="section-tag">PHOTOS</div>
+    <h2 class="section-title">照片卡片样式</h2>
+    <p class="section-desc">统一圆角、悬停动效、标签徽章</p>
+  </div>
+
+  <div class="photo-grid">
+    <div class="photo-card" style="background: linear-gradient(135deg, #c9b99a, #5a4a3a);">
+      <div class="photo-label">2026.06.24</div>
+    </div>
+    <div class="photo-card" style="background: linear-gradient(135deg, #4a5a6a, #2a3a4a);">
+      <div class="photo-label">2026.05.12</div>
+    </div>
+    <div class="photo-card" style="background: linear-gradient(135deg, #6a5a4a, #3a2a1a);">
+      <div class="photo-label">2026.04.08</div>
+    </div>
+    <div class="photo-card" style="background: linear-gradient(135deg, #5a6a5a, #2a3a2a);">
+      <div class="photo-label">2026.03.21</div>
+    </div>
+  </div>
+
+  <!-- 标签分类预览（卡片形式） -->
+  <div class="section-header" style="margin-top: 60px;">
+    <div class="section-tag">TAGS</div>
+    <h2 class="section-title">标签分类卡片</h2>
+    <p class="section-desc">与分区卡片同尺寸 · 统一风格</p>
+  </div>
+
+  <div class="zone-grid">
+    <div class="zone-card">
+      <div>
+        <div class="zone-icon">📅</div>
+        <div class="zone-name">月份</div>
+        <div class="zone-desc">按拍摄月份自动分类照片</div>
+      </div>
+      <div class="zone-stat">3 个分类 · 28 张照片</div>
+    </div>
+
+    <div class="zone-card">
+      <div>
+        <div class="zone-icon">🏖️</div>
+        <div class="zone-name">旅行</div>
+        <div class="zone-desc">用户自定义标签</div>
+      </div>
+      <div class="zone-stat">12 张照片</div>
+    </div>
+
+    <div class="zone-card">
+      <div>
+        <div class="zone-icon">👨‍👩‍👧</div>
+        <div class="zone-name">家庭</div>
+        <div class="zone-desc">用户自定义标签</div>
+      </div>
+      <div class="zone-stat">8 张照片</div>
+    </div>
+
+    <div class="zone-card">
+      <div>
+        <div class="zone-icon">🍔</div>
+        <div class="zone-name">美食</div>
+        <div class="zone-desc">用户自定义标签</div>
+      </div>
+      <div class="zone-stat">5 张照片</div>
+    </div>
+
+    <div class="zone-card">
+      <div>
+        <div class="zone-icon">🌸</div>
+        <div class="zone-name">春天</div>
+        <div class="zone-desc">用户自定义标签</div>
+      </div>
+      <div class="zone-stat">3 张照片</div>
+    </div>
+
+    <div class="zone-card tag-card-create">
+      <div>
+        <div class="zone-icon">+</div>
+        <div class="zone-name">新建标签</div>
+        <div class="zone-desc">创建自定义分类</div>
+      </div>
+      <div class="zone-stat">点击创建</div>
+    </div>
+  </div>
+
+  <!-- 按钮设计系统 -->
+  <div class="section-header" style="margin-top: 80px;">
+    <div class="section-tag">BUTTONS</div>
+    <h2 class="section-title">按钮设计系统</h2>
+    <p class="section-desc">5 种按钮类型 · 统一规范 · 全站复用</p>
+  </div>
+
+  <div class="btn-showcase">
+    <div class="btn-cell">
+      <div class="btn-cell-label">PRIMARY</div>
+      <button class="btn-primary">主按钮</button>
+    </div>
+    <div class="btn-cell">
+      <div class="btn-cell-label">SECONDARY</div>
+      <button class="btn-secondary">次按钮</button>
+    </div>
+    <div class="btn-cell">
+      <div class="btn-cell-label">ICON</div>
+      <button class="btn-icon">⚙</button>
+    </div>
+    <div class="btn-cell">
+      <div class="btn-cell-label">TEXT</div>
+      <button class="btn-text">文字链接</button>
+    </div>
+    <div class="btn-cell">
+      <div class="btn-cell-label">DANGER</div>
+      <button class="btn-danger">危险操作</button>
+    </div>
+  </div>
+
+  <!-- 排版系统 -->
+  <div class="section-header" style="margin-top: 80px;">
+    <div class="section-tag">TYPOGRAPHY</div>
+    <h2 class="section-title">排版系统</h2>
+    <p class="section-desc">字号 / 字重 / 字距规范</p>
+  </div>
+
+  <div class="btn-cell" style="padding: 32px; text-align: left;">
+    <div class="typo-row">
+      <div class="typo-label">TAG / 11px</div>
+      <div class="typo-sample typo-tag-text">SECTION TITLE</div>
+    </div>
+    <div class="typo-row">
+      <div class="typo-label">CAPTION / 12px</div>
+      <div class="typo-sample typo-caption">辅助说明文字</div>
+    </div>
+    <div class="typo-row">
+      <div class="typo-label">BODY / 14px</div>
+      <div class="typo-sample typo-body">这是一段正文内容,描述卡片或说明信息。</div>
+    </div>
+    <div class="typo-row">
+      <div class="typo-label">H3 / 18px</div>
+      <div class="typo-sample typo-h3">卡片标题</div>
+    </div>
+    <div class="typo-row">
+      <div class="typo-label">H2 / 24px</div>
+      <div class="typo-sample typo-h2">分区标题</div>
+    </div>
+    <div class="typo-row" style="border-bottom: none;">
+      <div class="typo-label">H1 / 32px</div>
+      <div class="typo-sample typo-h1">主标题</div>
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 80px; padding: 32px 0; color: var(--text-3); font-size: 12px; letter-spacing: 0.2em;">
+    — PREVIEW END · 点击右上角切换主题 —
+  </div>
+</section>
+
+<script>
+// 主题切换图标更新
+const observer = new MutationObserver(() => {
+  const isLight = document.documentElement.dataset.theme === 'light';
+  document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
+  document.getElementById('theme-label').textContent = isLight ? '深色' : '浅色';
+});
+observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// 导航切换
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>
