@@ -153,27 +153,45 @@ npx http-server -p 8000 --cors
 
 ## 界面展示
 
-### 欢迎页与导入
+### 首页
 
-| 欢迎页 | 导入照片 | 网格视图 |
-|:------:|:--------:|:--------:|
-| ![欢迎页](screenshots/01_welcome.png) | ![导入](screenshots/02_import.png) | ![网格](screenshots/03_grid.png) |
+![首页](screenshots/首页.png)
 
-### 浏览模式
+### 主页
 
-| 轮播视图 | 3D 环形 | 翻页书 |
-|:--------:|:-------:|:------:|
-| ![轮播](screenshots/04_carousel.png) | ![3D环形](screenshots/05_3d_ring.png) | ![翻页书](screenshots/06_book.png) |
+![主页](screenshots/主页.png)
 
-| 翻书效果 | 3D 手势 |
-|:--------:|:-------:|
-| ![翻书](screenshots/10_book_flip.png) | ![手势](screenshots/11_gesture.png) |
+![主页2](screenshots/主页%20(2).png)
 
-### 详情与筛选
+### 浏览模式功能
 
-| 照片详情 | 日历筛选 | 添加照片 |
-|:--------:|:--------:|:--------:|
-| ![详情](screenshots/07_detail.png) | ![日历](screenshots/08_calendar.png) | ![添加](screenshots/09_add_photos.png) |
+![浏览模式功能](screenshots/浏览模式功能截图.png)
+
+### 横轴模式
+
+![横轴模式](screenshots/横轴模式截图.png)
+
+### 电子书籍相册
+
+![电子书籍相册](screenshots/电子书籍相册.png)
+
+### 翻页相册
+
+![翻页相册](screenshots/翻页相册.png)
+
+![翻页相册2](screenshots/翻页相册2.png)
+
+### 3D 模式
+
+![3D模式](screenshots/3D模式.png)
+
+### 月份标签
+
+![月份标签](screenshots/月份标签.png)
+
+### 标签分类
+
+![标签分类](screenshots/标签分类.png)
 
 ---
 
