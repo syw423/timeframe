@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TimeFrame · 翻页书原型 v2</title>
+<style>
+/* ============================================================
+   主题变量
+   ============================================================ */
+:root {
+  --bg: #0f0e0c;
+  --bg-2: #1a1814;
+  --bg-3: #252220;
+  --text: #e8e0d4;
+  --text-2: #b8a89a;
+  --text-3: #8a7a6c;
+  --accent: #c9b59b;
+  --accent-soft: rgba(201, 181, 155, 0.08);
+  --accent-soft-hover: rgba(201, 181, 155, 0.18);
+  --accent-border: rgba(201, 181, 155, 0.3);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --glass: rgba(40, 36, 32, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --page-paper: #f5efe2;
+  --page-paper-shadow: rgba(170, 130, 80, 0.15);
+  --page-spine: #8a6a4a;
+  --page-text: #3d2e1e;
+  --page-text-soft: #6a5a4a;
+}
+[data-theme="light"] {
+  --bg: #fafaf7;
+  --bg-2: #ffffff;
+  --bg-3: #f4f2ec;
+  --text: #1a1a1a;
+  --text-2: #555;
+  --text-3: #999;
+  --accent: #a08055;
+  --accent-soft: rgba(160, 128, 85, 0.08);
+  --accent-soft-hover: rgba(160, 128, 85, 0.18);
+  --accent-border: rgba(160, 128, 85, 0.3);
+  --shadow: rgba(0, 0, 0, 0.15);
+  --page-paper: #fdfaf3;
+  --page-paper-shadow: rgba(0, 0, 0, 0.08);
+  --page-text: #2a1f18;
+  --page-text-soft: #5a4a3a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", serif;
+  overflow: hidden;
+}
+
+/* 顶部条 */
+.proto-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 48px;
+  display: flex; align-items: center;
+  padding: 0 20px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  z-index: 200;
+  gap: 16px;
+}
+.proto-bar h1 { font-size: 14px; font-weight: 500; letter-spacing: 0.05em; }
+.proto-bar .spacer { flex: 1; }
+.proto-bar button {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.proto-bar button:hover { color: var(--text); border-color: var(--border-hover); }
+.proto-bar button.active { color: var(--text); background: var(--accent-soft); border-color: var(--accent-border); }
+
+/* 翻书舞台 */
+.book-stage {
+  position: absolute;
+  top: 48px; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 30%, var(--bg-2) 0%, var(--bg) 70%);
+  overflow: hidden;
+  /* perspective：让翻页时纸张有立体感 */
+  perspective: 2000px;
+  perspective-origin: 50% 35%;
+}
+
+.book-stage::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    repeating-linear-gradient(90deg,
+      transparent 0 80px,
+      rgba(255,255,255,0.012) 80px 81px);
+  pointer-events: none;
+}
+
+/* ============================================================
+   书本（双页书，每张纸 = recto + verso）
+   书本宽度 = 2 个页面宽，居中显示
+   ============================================================ */
+/* 翻书容器（wrap）— flex 居中 */
+.book-wrap {
+  position: relative;
+  width: 600px;
+  max-width: 90vw;
+  height: 400px;
+  max-height: 60vh;
+  flex-shrink: 0;
+  transform-style: preserve-3d;
+}
+
+/* 书本本身 */
+.book {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform-style: preserve-3d;
+}
+
+/* 装订线（屏幕中央） */
+.book-spine {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: 4px;
+  transform: translateX(-50%);
+  background: linear-gradient(to right,
+    transparent 0%,
+    rgba(0,0,0,0.4) 50%,
+    transparent 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 单张纸 */
+.book-paper {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  transition: transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.book-paper.flipping {
+  z-index: 9999 !important;
+  transition: transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1);
+  box-shadow:
+    -8px 0 20px rgba(0,0,0,0.3),
+    0 0 30px rgba(0,0,0,0.2);
+}
+
+.book-paper.flipped {
+  transform: rotateY(-180deg);
+}
+
+/* ============================================================
+   半页（recto 左 / verso 右）
+   ============================================================ */
+.book-half {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+  background: var(--page-paper);
+  box-shadow:
+    inset 0 0 30px var(--page-paper-shadow);
+}
+
+.book-half.recto {
+  left: 0;
+}
+
+.book-half.verso {
+  right: 0;
+  transform: rotateY(180deg);
+  transform-origin: left center;
+}
+
+/* 装订线（在每张纸的中央） */
+.book-paper::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: var(--page-spine);
+  transform: translateX(-50%);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* 照片容器 */
+.book-photo-frame {
+  position: absolute;
+  top: 8%;
+  left: 6%;
+  right: 6%;
+  bottom: 18%;
+  background: var(--bg-3);
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.1),
+    0 2px 8px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+.book-photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.book-photo-meta {
+  position: absolute;
+  bottom: 5%;
+  left: 6%;
+  right: 6%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+.book-photo-date {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--page-text-soft);
+}
+.book-photo-num {
+  font-size: 10px;
+  color: var(--page-text-soft);
+  opacity: 0.6;
+  letter-spacing: 0.1em;
+}
+
+/* 封面 / 封底 */
+.book-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(255,255,255,0.05) 0%,
+      transparent 60%),
+    var(--page-paper);
+  box-shadow: inset 0 0 60px var(--page-paper-shadow);
+  text-align: center;
+  padding: 20px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+.book-cover-deco {
+  font-size: 11px;
+  color: var(--page-text-soft);
+  letter-spacing: 5px;
+  margin-bottom: 12px;
+  opacity: 0.7;
+}
+.book-cover-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--page-text);
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  line-height: 1.2;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+}
+.book-cover-rule {
+  width: 50px;
+  height: 1px;
+  background: var(--page-text-soft);
+  margin: 8px 0;
+  opacity: 0.4;
+}
+.book-cover-year {
+  font-size: 16px;
+  font-style: italic;
+  color: var(--page-text-soft);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+.book-cover-stat {
+  font-size: 11px;
+  color: var(--page-text-soft);
+  letter-spacing: 2px;
+  opacity: 0.8;
+}
+.book-cover-stat em {
+  font-style: normal;
+  color: var(--page-text);
+  font-weight: 600;
+  margin: 0 4px;
+}
+.book-cover-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--page-text-soft);
+  opacity: 0.3;
+}
+.book-cover-corner.tl { top: 12px; left: 12px; border-right: none; border-bottom: none; }
+.book-cover-corner.tr { top: 12px; right: 12px; border-left: none; border-bottom: none; }
+.book-cover-corner.bl { bottom: 12px; left: 12px; border-right: none; border-top: none; }
+.book-cover-corner.br { bottom: 12px; right: 12px; border-left: none; border-top: none; }
+
+/* 控件 */
+.book-control {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  color: var(--text-2);
+  cursor: pointer;
+  z-index: 50;
+  backdrop-filter: blur(12px);
+  transition: all 0.25s;
+  font-size: 20px;
+  font-family: inherit;
+}
+.book-control:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  transform: translateY(-50%) scale(1.08);
+}
+.book-control:disabled { opacity: 0.3; cursor: not-allowed; }
+.book-control:disabled:hover { transform: translateY(-50%); background: var(--glass); }
+.book-control.prev { left: 24px; }
+.book-control.next { right: 24px; }
+
+.book-pagination {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  backdrop-filter: blur(12px);
+  font-size: 12px;
+  color: var(--text-2);
+  font-family: 'Georgia', serif;
+  z-index: 50;
+}
+.book-pagination-info {
+  font-style: italic;
+  letter-spacing: 0.05em;
+  min-width: 60px;
+  text-align: center;
+}
+
+.book-shadow {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  bottom: -30px;
+  height: 40px;
+  background: radial-gradient(ellipse at center, var(--shadow) 0%, transparent 70%);
+  filter: blur(8px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+}
+
+@media (max-width: 900px) {
+  .book-wrap { width: min(85vw, 560px); height: min(50vh, 360px); }
+  .book-cover-title { font-size: 20px; }
+  .book-cover-year { font-size: 14px; }
+}
+@media (max-width: 600px) {
+  .book-wrap { width: min(90vw, 420px); height: min(50vh, 300px); }
+  .book-control { width: 36px; height: 36px; font-size: 16px; }
+  .book-control.prev { left: 12px; }
+  .book-control.next { right: 12px; }
+  .book-cover-title { font-size: 16px; letter-spacing: 2px; }
+  .book-cover-year { font-size: 12px; }
+}
+
+.theme-toggle {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--border-hover); }
+</style>
+</head>
+<body data-theme="dark">
+<div class="proto-bar">
+  <h1>TimeFrame · 翻页书 v2 原型</h1>
+  <div class="spacer"></div>
+  <button class="active" data-style="elegant">📜 古籍</button>
+  <button data-style="modern">✨ 现代</button>
+  <button class="theme-toggle" id="themeToggle">🌙</button>
+</div>
+
+<div class="book-stage">
+  <div class="book-wrap">
+    <div class="book" id="book">
+      <div class="book-spine"></div>
+      <!-- 纸张由 JS 注入 -->
+    </div>
+  </div>
+  <div class="book-shadow"></div>
+
+  <button class="book-control prev" id="prevBtn">‹</button>
+  <button class="book-control next" id="nextBtn">›</button>
+
+  <div class="book-pagination">
+    <span class="book-pagination-info" id="pageInfo">封面</span>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 模拟数据
+// ============================================================
+const MOCK_DATA = [];
+const COLORS = [
+  ['#ff9a8b', '#ff6a88'], ['#43cea2', '#185a9d'], ['#ff9966', '#ff5e62'],
+  ['#56ab2f', '#a8e063'], ['#614385', '#516395'], ['#02aab0', '#00cdac'],
+  ['#f7971e', '#ffd200'], ['#c471f5', '#fa71cd'], ['#13547a', '#80d0c7'],
+  ['#ffafbd', '#ffc3a0'], ['#a8edea', '#fed6e3'], ['#d299c2', '#fef9d7'],
+  ['#f5f7fa', '#c3cfe2'], ['#667eea', '#764ba2'], ['#f093fb', '#f5576c'],
+  ['#fad0c4', '#ffd1ff'], ['#a18cd1', '#fbc2eb'], ['#84fab0', '#8fd3f4'],
+];
+
+for (let i = 0; i < 18; i++) {
+  const c = COLORS[i % COLORS.length];
+  MOCK_DATA.push({
+    id: 'p' + i,
+    date: `${2024 - (i % 3)}-${String((i % 12) + 1).padStart(2, '0')}-${String(((i * 7) % 28) + 1).padStart(2, '0')}`,
+    svg: generateSVG(c[0], c[1], i + 1),
+  });
+}
+
+function generateSVG(c1, c2, n) {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'>
+    <defs>
+      <linearGradient id='g${n}' x1='0%' y1='0%' x2='100%' y2='100%'>
+        <stop offset='0%' stop-color='${c1}'/>
+        <stop offset='100%' stop-color='${c2}'/>
+      </linearGradient>
+    </defs>
+    <rect width='400' height='300' fill='url(#g${n})'/>
+    <text x='200' y='150' text-anchor='middle' fill='white' font-family='Georgia' font-size='40' opacity='0.7'>#${n}</text>
+    <text x='200' y='200' text-anchor='middle' fill='white' font-family='Georgia' font-size='12' letter-spacing='3' opacity='0.5'>TIME FRAME</text>
+  </svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+// ============================================================
+// 书本结构（v2 双页书）
+// 每张纸 = recto(左半) + verso(右半)
+// N 张照片需要 ceil((N+2)/2) 张纸
+// - 纸 0: recto = 封面, verso = photo[0]
+// - 纸 1: recto = photo[1], verso = photo[2]
+// - 纸 last: recto = photo[N-2], verso = 封底
+// ============================================================
+
+const bookEl = document.getElementById('book');
+const pageInfo = document.getElementById('pageInfo');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const papers = [];
+let flippedCount = 0;
+let isFlipping = false;
+
+function buildBook() {
+  const spine = bookEl.querySelector('.book-spine');
+  bookEl.innerHTML = '';
+  if (spine) bookEl.appendChild(spine);
+
+  papers.length = 0;
+  flippedCount = 0;
+
+  const N = MOCK_DATA.length;
+  const totalPapers = Math.ceil((N + 2) / 2);
+
+  for (let i = 0; i < totalPapers; i++) {
+    const paper = document.createElement('div');
+    paper.className = 'book-paper';
+    paper.style.zIndex = totalPapers - i;
+    paper.dataset.origZ = totalPapers - i;
+
+    const recto = document.createElement('div');
+    recto.className = 'book-half recto';
+
+    const verso = document.createElement('div');
+    verso.className = 'book-half verso';
+
+    if (i === 0) {
+      recto.innerHTML = makeCoverHTML(N, '回忆相册', 'Photo Journal', false);
+      verso.innerHTML = makePhotoHTML(MOCK_DATA[0], 1, N);
+    } else if (i === totalPapers - 1) {
+      const rectoIdx = (i - 1) * 2 + 1;
+      if (rectoIdx < N) {
+        recto.innerHTML = makePhotoHTML(MOCK_DATA[rectoIdx], rectoIdx + 1, N);
+      }
+      verso.innerHTML = makeCoverHTML(N, 'THE END', 'TimeFrame · ' + new Date().getFullYear(), true);
+    } else {
+      const rectoIdx = (i - 1) * 2 + 1;
+      const versoIdx = (i - 1) * 2 + 2;
+      recto.innerHTML = makePhotoHTML(MOCK_DATA[rectoIdx], rectoIdx + 1, N);
+      verso.innerHTML = makePhotoHTML(MOCK_DATA[versoIdx], versoIdx + 1, N);
+    }
+
+    paper.appendChild(recto);
+    paper.appendChild(verso);
+    bookEl.appendChild(paper);
+    papers.push(paper);
+  }
+
+  updateUI();
+}
+
+function makePhotoHTML(photo, num, total) {
+  return `
+    <div class="book-photo-frame">
+      <img src="${photo.svg}" alt="">
+    </div>
+    <div class="book-photo-meta">
+      <span class="book-photo-date">${photo.date}</span>
+      <span class="book-photo-num">— ${String(num).padStart(2, '0')} / ${String(total).padStart(2, '0')} —</span>
+    </div>
+  `;
+}
+
+function makeCoverHTML(total, title, subtitle, isEnd) {
+  if (isEnd) {
+    return `
+      <div class="book-cover">
+        <div class="book-cover-corner tl"></div>
+        <div class="book-cover-corner tr"></div>
+        <div class="book-cover-corner bl"></div>
+        <div class="book-cover-corner br"></div>
+        <div class="book-cover-deco">· FIN ·</div>
+        <div class="book-cover-title">${title}</div>
+        <div class="book-cover-rule"></div>
+        <div class="book-cover-stat" style="margin-top:12px;">${subtitle}</div>
+      </div>
+    `;
+  }
+  return `
+    <div class="book-cover">
+      <div class="book-cover-corner tl"></div>
+      <div class="book-cover-corner tr"></div>
+      <div class="book-cover-corner bl"></div>
+      <div class="book-cover-corner br"></div>
+      <div class="book-cover-deco">· MEMORIES ·</div>
+      <div class="book-cover-title">${title}</div>
+      <div class="book-cover-rule"></div>
+      <div class="book-cover-year">${subtitle}</div>
+      <div class="book-cover-stat">共 <em>${total}</em> 张照片</div>
+    </div>
+  `;
+}
+
+function updateUI() {
+  const N = MOCK_DATA.length;
+  const totalPapers = papers.length;
+  if (flippedCount === 0) {
+    pageInfo.textContent = '封面';
+  } else if (flippedCount === totalPapers) {
+    pageInfo.textContent = '封底';
+  } else {
+    const leftPaperIdx = flippedCount - 1;
+    if (leftPaperIdx === 0) {
+      pageInfo.textContent = `第 1 张照片`;
+    } else {
+      const leftIdx = (leftPaperIdx - 1) * 2 + 2;
+      const rightIdx = leftIdx + 1;
+      const leftN = Math.min(leftIdx + 1, N);
+      const rightN = Math.min(rightIdx + 1, N);
+      if (rightN <= N) {
+        pageInfo.textContent = `第 ${leftN}–${rightN} 张`;
+      } else {
+        pageInfo.textContent = `第 ${leftN} 张`;
+      }
+    }
+  }
+  prevBtn.disabled = flippedCount === 0;
+  nextBtn.disabled = flippedCount === papers.length;
+}
+
+function flipNext() {
+  if (isFlipping) return;
+  if (flippedCount >= papers.length) return;
+
+  isFlipping = true;
+  const paper = papers[flippedCount];
+  paper.style.zIndex = 9999;
+  paper.classList.add('flipping');
+  requestAnimationFrame(() => {
+    paper.classList.add('flipped');
+  });
+  setTimeout(() => {
+    paper.classList.remove('flipping');
+    flippedCount++;
+    updateUI();
+    isFlipping = false;
+  }, 750);
+}
+
+function flipPrev() {
+  if (isFlipping) return;
+  if (flippedCount <= 0) return;
+
+  isFlipping = true;
+  flippedCount--;
+  const paper = papers[flippedCount];
+  paper.style.zIndex = 9999;
+  paper.classList.add('flipping');
+  requestAnimationFrame(() => {
+    paper.classList.remove('flipped');
+  });
+  setTimeout(() => {
+    paper.classList.remove('flipping');
+    paper.style.zIndex = parseInt(paper.dataset.origZ) || 0;
+    updateUI();
+    isFlipping = false;
+  }, 750);
+}
+
+prevBtn.addEventListener('click', flipPrev);
+nextBtn.addEventListener('click', flipNext);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') flipPrev();
+  if (e.key === 'ArrowRight') flipNext();
+});
+
+// 翻书舞台：左右点击翻页（但控件和弹窗区域排除）
+const bookStage = document.querySelector('.book-stage');
+bookStage.addEventListener('click', e => {
+  // 排除控件、页码、纸张本身（避免翻页中重复触发）
+  if (e.target.closest('.book-control, .book-pagination, .book, .book-paper, .book-half, .book-cover')) return;
+  const x = e.clientX;
+  const w = window.innerWidth;
+  if (x < w / 2) flipPrev();
+  else flipNext();
+});
+
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.addEventListener('click', () => {
+  const cur = document.body.dataset.theme;
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.body.dataset.theme = next;
+  themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+});
+
+document.querySelectorAll('.proto-bar button[data-style]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.proto-bar button[data-style]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const style = btn.dataset.style;
+    if (style === 'modern') {
+      document.documentElement.style.setProperty('--page-paper', '#ffffff');
+      document.documentElement.style.setProperty('--page-text', '#1a1a1a');
+      document.documentElement.style.setProperty('--page-text-soft', '#666');
+      document.documentElement.style.setProperty('--page-spine', '#d0d0d0');
+      document.documentElement.style.setProperty('--page-paper-shadow', 'rgba(0,0,0,0.05)');
+    } else {
+      document.documentElement.style.setProperty('--page-paper', '#f5efe2');
+      document.documentElement.style.setProperty('--page-text', '#3d2e1e');
+      document.documentElement.style.setProperty('--page-text-soft', '#6a5a4a');
+      document.documentElement.style.setProperty('--page-spine', '#8a6a4a');
+      document.documentElement.style.setProperty('--page-paper-shadow', 'rgba(170,130,80,0.15)');
+    }
+  });
+});
+
+buildBook();
+</script>
+</body>
+</html>
