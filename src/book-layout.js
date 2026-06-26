@@ -1,20 +1,19 @@
 // ==============================
-// 翻页书布局 v4
-// - 封面/封底是独立的 300px 单页元素
-// - 翻开时是 600px 双页 (2 张照片)
-// - 书本永远居中
+// 3D 翻页书布局 - 纸模型
 // ==============================
 
 let containerEl = null;
 let bookEl = null;
 let bookWrapper = null;
-let coverEl = null;      // 封面元素 (独立)
-let backCoverEl = null;  // 封底元素 (独立)
-let openContainerEl = null; // 翻开状态容器
-let currentFlippedCount = 0;  // 当前翻开次数
-let totalPhotos = 0;
+let currentPage = 0;
+let totalPapers = 0;
+let papers = [];
+let years = [];
+let currentYearIdx = 0;
 let isFlipping = false;
 let photoData = [];
+let yearNavEl = null;
+let coverUrl = null;
 let blobUrls = [];
 
 // ==============================
@@ -24,162 +23,174 @@ export function renderBook(container, data) {
   if (!container) return;
   containerEl = container;
   photoData = data;
-  currentFlippedCount = 0;
+  currentPage = 0;
   isFlipping = false;
-  totalPhotos = data.length;
 
   if (data.length === 0) return;
+
+  // 获取年份列表
+  const yearSet = new Set();
+  data.forEach(p => {
+    const y = p.date ? p.date.split('-')[0] : '未知';
+    yearSet.add(y);
+  });
+  years = [...yearSet].sort();
+  currentYearIdx = 0;
 
   container.innerHTML = '';
 
   // 创建书的外层容器
   bookWrapper = document.createElement('div');
   bookWrapper.className = 'book-wrapper';
-  bookWrapper.addEventListener('click', onWrapperClick);
+
+  // 年份导航
+  yearNavEl = document.createElement('div');
+  yearNavEl.className = 'book-year-nav';
+  renderYearNav();
+  bookWrapper.appendChild(yearNavEl);
 
   // 书的容器
   bookEl = document.createElement('div');
-  bookEl.className = 'book is-cover';
+  bookEl.className = 'book';
   bookEl.id = 'book-el';
   bookWrapper.appendChild(bookEl);
 
-  // 创建封面 (单页)
-  coverEl = document.createElement('div');
-  coverEl.className = 'book-cover-page';
-  coverEl.innerHTML = makeCoverHTML(totalPhotos, '回忆相册', 'Photo Journal');
-  bookEl.appendChild(coverEl);
+  // 创建页面
+  buildBookPages(bookEl, data);
 
-  // 创建翻开状态的容器 (放 2 张照片)
-  openContainerEl = document.createElement('div');
-  openContainerEl.className = 'book-open-pages';
-  bookEl.appendChild(openContainerEl);
-
-  // 创建封底 (单页)
-  backCoverEl = document.createElement('div');
-  backCoverEl.className = 'book-back-cover-page';
-  backCoverEl.innerHTML = makeCoverHTML(totalPhotos, 'THE END', 'TimeFrame · ' + new Date().getFullYear(), true);
-  bookEl.appendChild(backCoverEl);
-
-  // 初始显示封面
-  updateBookState();
+  // 翻页点击：检测点击位置在左页还是右页
+  bookWrapper.addEventListener('click', onWrapperClick);
 
   container.appendChild(bookWrapper);
 
-  // 键盘 ← → 翻页
-  document.addEventListener('keydown', onKeyDown);
+  // 窗口变化
+  window.addEventListener('resize', onResize);
+
+  // 初始化：显示封面
+  setTimeout(() => {
+    updateVisiblePages();
+  }, 100);
 }
 
 // ==============================
-// 翻页点击
+// 翻页点击检测
 // ==============================
 function onWrapperClick(e) {
+  // 排除年份导航等控件点击
+  if (e.target.closest('.book-year-nav, .book-year-btn')) return;
   if (isFlipping) return;
   if (!bookEl) return;
 
-  const state = getCurrentState();
-  if (state === 'cover') {
-    flipRight();
-    return;
-  }
-  if (state === 'back') {
-    flipLeft();
-    return;
-  }
-
-  // 翻开状态: 以书本中分线判断左右
   const bookRect = bookEl.getBoundingClientRect();
-  const midX = bookRect.left + bookRect.width / 2;
-  if (e.clientX < midX) {
-    flipLeft();
+  const clickX = e.clientX;
+  const deadZone = 10; // px 容差
+
+  if (currentPage === 0) {
+    // 封面模式：右半页翻下一页
+    if (clickX > bookRect.left + bookRect.width * 0.5) {
+      flipRight();
+    }
   } else {
-    flipRight();
+    // 翻开模式：左页翻上一页，右页翻下一页
+    if (clickX < bookRect.left - deadZone) {
+      flipLeft();
+    } else if (clickX > bookRect.left + deadZone) {
+      flipRight();
+    }
   }
 }
 
 // ==============================
-// 键盘支持
+// 构建书页
 // ==============================
-function onKeyDown(e) {
-  if (e.key === 'ArrowRight') {
-    e.preventDefault();
-    if (!isFlipping && bookEl) flipRight();
-  } else if (e.key === 'ArrowLeft') {
-    e.preventDefault();
-    if (!isFlipping && bookEl) flipLeft();
-  }
-}
+function buildBookPages(bookEl, data) {
+  papers = [];
+  totalPapers = data.length;
 
-// ==============================
-// 状态判断
-// ==============================
-function getCurrentState() {
-  if (currentFlippedCount === 0) return 'cover';
-  const lastOpenIdx = Math.ceil(totalPhotos / 2);
-  if (currentFlippedCount > lastOpenIdx) return 'back';
-  return 'open';
-}
-
-function updateBookState() {
-  if (!bookEl) return;
-  bookEl.classList.remove('is-cover', 'is-open', 'is-back');
-  const state = getCurrentState();
-  bookEl.classList.add('is-' + state);
-
-  // 翻开状态: 更新 2 张照片
-  if (state === 'open' && openContainerEl) {
-    renderOpenPages();
-  }
-}
-
-// ==============================
-// 渲染翻开的 2 张照片
-// ==============================
-function renderOpenPages() {
-  if (!openContainerEl) return;
-  openContainerEl.innerHTML = '';
-
-  // 当前翻开 2 张: photo[currentFlippedCount*2 - 2] 和 photo[currentFlippedCount*2 - 1]
-  // 例: currentFlippedCount=1 → 显示 photo[0] (左) + photo[1] (右)
-  //     currentFlippedCount=2 → 显示 photo[2] (左) + photo[3] (右)
-  const baseIdx = (currentFlippedCount - 1) * 2;
-  const leftIdx = baseIdx;
-  const rightIdx = baseIdx + 1;
-
-  if (leftIdx < totalPhotos) {
-    const page = createPhotoPage(leftIdx, 'left');
-    openContainerEl.appendChild(page);
-  }
-  if (rightIdx < totalPhotos) {
-    const page = createPhotoPage(rightIdx, 'right');
-    openContainerEl.appendChild(page);
-  }
-}
-
-function createPhotoPage(idx, side) {
-  const page = document.createElement('div');
-  page.className = `book-photo-page book-photo-${side}`;
-
-  const frame = document.createElement('div');
-  frame.className = 'book-photo-frame';
-
-  const img = document.createElement('img');
-  if (typeof photoData[idx].file === 'string') {
-    img.src = photoData[idx].file;
-  } else {
-    const url = URL.createObjectURL(photoData[idx].file);
+  function createBlob(file) {
+    const url = URL.createObjectURL(file);
     blobUrls.push(url);
-    img.src = url;
+    return url;
   }
-  img.draggable = false;
-  frame.appendChild(img);
 
-  const meta = document.createElement('div');
-  meta.className = 'book-photo-meta';
-  meta.innerHTML = `<span class="book-photo-date">${photoData[idx].date || ''}</span><span class="book-photo-num">— ${String(idx + 1).padStart(2, '0')} / ${String(totalPhotos).padStart(2, '0')} —</span>`;
+  // Paper 0: 封面 - 随机选一张照片
+  const coverPaper = document.createElement('div');
+  coverPaper.className = 'book-paper';
+  coverPaper.style.zIndex = totalPapers;
+  coverPaper.dataset.origZ = totalPapers;
 
-  page.appendChild(frame);
-  page.appendChild(meta);
-  return page;
+  const coverFront = document.createElement('div');
+  coverFront.className = 'book-page front';
+
+  const coverIdx = Math.floor(Math.random() * data.length);
+  const coverImg = document.createElement('img');
+  coverImg.src = createBlob(data[coverIdx].file);
+  coverImg.draggable = false;
+  coverFront.appendChild(coverImg);
+
+  const coverTitleEl = document.createElement('div');
+  coverTitleEl.className = 'book-cover-title';
+  coverTitleEl.textContent = '📒 回忆相册';
+  coverFront.appendChild(coverTitleEl);
+
+  const coverSub = document.createElement('div');
+  coverSub.className = 'book-cover-sub';
+  coverSub.textContent = '📷 ' + data.length + ' 张照片';
+  coverFront.appendChild(coverSub);
+  coverPaper.appendChild(coverFront);
+
+  // 封面背面：显示第一张照片
+  const coverBack = document.createElement('div');
+  coverBack.className = 'book-page back';
+  const backImg = document.createElement('img');
+  backImg.src = createBlob(data[0].file);
+  backImg.draggable = false;
+  coverBack.appendChild(backImg);
+  const backLabel = document.createElement('div');
+  backLabel.className = 'book-page-label';
+  backLabel.textContent = data[0].date || '';
+  coverBack.appendChild(backLabel);
+  coverPaper.appendChild(coverBack);
+
+  bookEl.appendChild(coverPaper);
+  papers.push(coverPaper);
+
+  // Paper 1 起：data[1] 到 data[last]
+  for (let i = 1; i < data.length; i++) {
+    const paper = document.createElement('div');
+    paper.className = 'book-paper';
+    paper.style.zIndex = totalPapers - i;
+    paper.dataset.origZ = totalPapers - i;
+
+    // 正面
+    const front = document.createElement('div');
+    front.className = 'book-page front';
+    const imgFront = document.createElement('img');
+    imgFront.src = createBlob(data[i].file);
+    imgFront.draggable = false;
+    const dateLabel = document.createElement('div');
+    dateLabel.className = 'book-page-label';
+    dateLabel.textContent = data[i].date || '';
+    front.appendChild(imgFront);
+    front.appendChild(dateLabel);
+    paper.appendChild(front);
+
+    // 背面
+    const back = document.createElement('div');
+    back.className = 'book-page back';
+    const imgBack = document.createElement('img');
+    imgBack.src = createBlob(data[i].file);
+    imgBack.draggable = false;
+    const backDateLabel = document.createElement('div');
+    backDateLabel.className = 'book-page-label';
+    backDateLabel.textContent = data[i].date || '';
+    back.appendChild(imgBack);
+    back.appendChild(backDateLabel);
+    paper.appendChild(back);
+
+    bookEl.appendChild(paper);
+    papers.push(paper);
+  }
 }
 
 // ==============================
@@ -187,66 +198,180 @@ function createPhotoPage(idx, side) {
 // ==============================
 function flipRight() {
   if (isFlipping) return;
-  const maxFlipped = Math.ceil(totalPhotos / 2) + 1;
-  if (currentFlippedCount >= maxFlipped) return;
+  if (currentPage >= totalPapers - 1) return;
 
   isFlipping = true;
-  currentFlippedCount++;
-  updateBookState();
+  const paper = papers[currentPage];
+  paper.style.zIndex = 9999;
+  paper.classList.add('flipping');
+  paper.classList.add('flipped');
+
+  currentPage++;
+  updateYearNav();
+
+  // 去掉上一张纸的翻转过渡
+  if (currentPage > 1) {
+    const prevPaper = papers[currentPage - 2];
+    prevPaper.classList.remove('flipping');
+  }
 
   setTimeout(() => {
+    paper.classList.remove('flipping');
+    paper.style.zIndex = 0;
+    updateBookPosition();
     isFlipping = false;
   }, 600);
 }
 
 function flipLeft() {
   if (isFlipping) return;
-  if (currentFlippedCount <= 0) return;
+  if (currentPage <= 0) return;
 
   isFlipping = true;
-  currentFlippedCount--;
-  updateBookState();
+  currentPage--;
+  const paper = papers[currentPage];
+  paper.style.zIndex = 9999;
+  paper.classList.add('flipping');
+  paper.classList.remove('flipped');
 
+  updateYearNav();
+
+  // 去掉过渡
   setTimeout(() => {
+    paper.classList.remove('flipping');
+    const origZ = parseInt(paper.dataset.origZ) || 0;
+    paper.style.zIndex = origZ;
+    updateBookPosition();
     isFlipping = false;
   }, 600);
 }
 
 // ==============================
-// 封面/封底 HTML
+// 更新可见页面
 // ==============================
-function makeCoverHTML(total, title, subtitle, isEnd) {
-  if (isEnd) {
-    return `<div class="book-cover">
-      <div class="book-cover-corner tl"></div>
-      <div class="book-cover-corner tr"></div>
-      <div class="book-cover-corner bl"></div>
-      <div class="book-cover-corner br"></div>
-      <div class="book-cover-deco">· FIN ·</div>
-      <div class="book-cover-title">${title}</div>
-      <div class="book-cover-rule"></div>
-      <div class="book-cover-stat" style="margin-top:12px;">${subtitle}</div>
-    </div>`;
+function updateVisiblePages() {
+  if (papers.length > 0) {
+    // 初始状态：封面在右侧，不翻转
+    for (let i = 0; i < papers.length; i++) {
+      const p = papers[i];
+      p.classList.remove('flipped');
+      p.classList.remove('flipping');
+      const origZ = parseInt(p.dataset.origZ) || 0;
+      p.style.zIndex = origZ;
+    }
   }
-  return `<div class="book-cover">
-    <div class="book-cover-corner tl"></div>
-    <div class="book-cover-corner tr"></div>
-    <div class="book-cover-corner bl"></div>
-    <div class="book-cover-corner br"></div>
-    <div class="book-cover-deco">· MEMORIES ·</div>
-    <div class="book-cover-title">${title}</div>
-    <div class="book-cover-rule"></div>
-    <div class="book-cover-year">${subtitle}</div>
-    <div class="book-cover-stat">共 <em>${total}</em> 张照片</div>
-  </div>`;
+  currentPage = 0;
+  updateBookPosition();
+}
+
+// ==============================
+// 更新书的位置（封面居中 vs 翻开居中）
+// ==============================
+function updateBookPosition() {
+  if (!bookEl) return;
+  if (currentPage > 0) {
+    bookEl.classList.add('open');
+  } else {
+    bookEl.classList.remove('open');
+  }
+}
+
+// ==============================
+// 年份导航
+// ==============================
+function renderYearNav() {
+  if (!yearNavEl) return;
+  yearNavEl.innerHTML = '';
+  years.forEach((year, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'book-year-btn' + (idx === currentYearIdx ? ' active' : '');
+    btn.textContent = year;
+    btn.addEventListener('click', () => jumpToYear(year));
+    yearNavEl.appendChild(btn);
+  });
+}
+
+function updateYearNav() {
+  if (!yearNavEl) return;
+  const btns = yearNavEl.querySelectorAll('.book-year-btn');
+  const photoIdx = currentPage > 0 ? currentPage - 1 : 0;
+  const currentData = photoData[photoIdx];
+  if (!currentData) return;
+  const curYear = currentData.date ? currentData.date.split('-')[0] : '未知';
+  const yearIdx = years.indexOf(curYear);
+  if (yearIdx !== -1 && yearIdx !== currentYearIdx) {
+    currentYearIdx = yearIdx;
+    btns.forEach((btn, i) => {
+      btn.classList.toggle('active', i === currentYearIdx);
+    });
+    if (yearNavEl) {
+      const activeBtn = yearNavEl.querySelector('.active');
+      if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }
+}
+
+function jumpToYear(year) {
+  const idx = photoData.findIndex(p => p.date && p.date.startsWith(year));
+  if (idx === -1) return;
+
+  const targetPage = idx + 1;
+  if (targetPage === currentPage) return;
+  if (targetPage < 0 || targetPage >= totalPapers) return;
+
+  // 批量翻页
+  isFlipping = true;
+  const step = targetPage > currentPage ? 1 : -1;
+
+  function stepFlip() {
+    if (targetPage > currentPage) {
+      if (currentPage >= targetPage) {
+        // 重置所有翻过的纸的 z-index
+        for (let i = 0; i < currentPage; i++) {
+          papers[i].style.zIndex = 0;
+          papers[i].classList.remove('flipping');
+        }
+        isFlipping = false;
+        updateBookPosition();
+        return;
+      }
+      const paper = papers[currentPage];
+      paper.style.zIndex = 9999;
+      paper.classList.add('flipping');
+      paper.classList.add('flipped');
+      currentPage++;
+    } else {
+      if (currentPage <= targetPage) {
+        isFlipping = false;
+        updateVisiblePages();
+        return;
+      }
+      currentPage--;
+      const paper = papers[currentPage];
+      paper.style.zIndex = 9999;
+      paper.classList.add('flipping');
+      paper.classList.remove('flipped');
+    }
+    updateYearNav();
+
+    setTimeout(stepFlip, 200);
+  }
+
+  stepFlip();
+}
+
+// ==============================
+// 窗口变化
+// ==============================
+function onResize() {
+  // 书会自动按比例缩放
 }
 
 // ==============================
 // 销毁
 // ==============================
 export function destroyBook() {
-  document.removeEventListener('keydown', onKeyDown);
-
+  // 撤销 blob URLs
   for (const url of blobUrls) {
     try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
   }
@@ -258,14 +383,15 @@ export function destroyBook() {
   if (bookWrapper) {
     bookWrapper.removeEventListener('click', onWrapperClick);
   }
+  papers = [];
   photoData = [];
-  currentFlippedCount = 0;
-  totalPhotos = 0;
+  currentPage = 0;
+  totalPapers = 0;
   isFlipping = false;
   containerEl = null;
   bookEl = null;
   bookWrapper = null;
-  coverEl = null;
-  backCoverEl = null;
-  openContainerEl = null;
+  yearNavEl = null;
+  coverUrl = null;
+  window.removeEventListener('resize', onResize);
 }
