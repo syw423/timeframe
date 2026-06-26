@@ -162,14 +162,19 @@ function buildBookPages(bookEl, data) {
     // 正面
     const front = document.createElement('div');
     front.className = 'book-page front';
-    const imgFront = document.createElement('img');
-    imgFront.src = createBlob(data[i].file);
-    imgFront.draggable = false;
-    const dateLabel = document.createElement('div');
-    dateLabel.className = 'book-page-label';
-    dateLabel.textContent = data[i].date || '';
-    front.appendChild(imgFront);
-    front.appendChild(dateLabel);
+    
+    // 奇数张照片: 最后一张纸的正面留空(右侧空白)
+    const isEmptyRight = (data.length % 2 === 1) && (i === data.length - 1);
+    if (!isEmptyRight) {
+      const imgFront = document.createElement('img');
+      imgFront.src = createBlob(data[i].file);
+      imgFront.draggable = false;
+      front.appendChild(imgFront);
+      const dateLabel = document.createElement('div');
+      dateLabel.className = 'book-page-label';
+      dateLabel.textContent = data[i].date || '';
+      front.appendChild(dateLabel);
+    }
     paper.appendChild(front);
 
     // 背面
