@@ -2662,6 +2662,34 @@ body {
   transform: translateX(50%);
 }
 
+/* 封底模式：居中单页 */
+.book.is-back {
+  transform: translateX(0);
+}
+
+/* 封底元素 */
+.book-back-cover {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(255,255,255,0.05) 0%,
+      transparent 60%),
+    #f5efe2;
+  box-shadow: inset 0 0 60px rgba(170,130,80,0.06);
+  border-radius: inherit;
+}
+
+.book-back-cover-inner {
+  text-align: center;
+  padding: 20px;
+  pointer-events: none;
+}
+
 /* 纸张 */
 .book-paper {
   position: absolute;

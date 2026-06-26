@@ -15,6 +15,7 @@ let photoData = [];
 let yearNavEl = null;
 let coverUrl = null;
 let blobUrls = [];
+let backCoverEl = null; // 封底元素
 
 // ==============================
 // 主渲染入口
@@ -58,6 +59,12 @@ export function renderBook(container, data) {
   // 创建页面
   buildBookPages(bookEl, data);
 
+  // 封底
+  backCoverEl = document.createElement('div');
+  backCoverEl.className = 'book-back-cover';
+  backCoverEl.innerHTML = makeBackCoverHTML();
+  bookEl.appendChild(backCoverEl);
+
   // 翻页点击：检测点击位置在左页还是右页
   bookWrapper.addEventListener('click', onWrapperClick);
 
@@ -89,6 +96,11 @@ function onWrapperClick(e) {
     // 封面模式：右半页翻下一页
     if (clickX > bookRect.left + bookRect.width * 0.5) {
       flipRight();
+    }
+  } else if (currentPage >= totalPapers) {
+    // 封底模式：左半页翻回上一页
+    if (clickX < bookRect.left + bookRect.width * 0.5) {
+      flipLeft();
     }
   } else {
     // 翻开模式：左页翻上一页，右页翻下一页
@@ -198,7 +210,7 @@ function buildBookPages(bookEl, data) {
 // ==============================
 function flipRight() {
   if (isFlipping) return;
-  if (currentPage >= totalPapers - 1) return;
+  if (currentPage >= totalPapers) return;
 
   isFlipping = true;
   const paper = papers[currentPage];
@@ -210,7 +222,7 @@ function flipRight() {
   updateYearNav();
 
   // 去掉上一张纸的翻转过渡
-  if (currentPage > 1) {
+  if (currentPage > 1 && currentPage < totalPapers) {
     const prevPaper = papers[currentPage - 2];
     prevPaper.classList.remove('flipping');
   }
@@ -226,6 +238,31 @@ function flipRight() {
 function flipLeft() {
   if (isFlipping) return;
   if (currentPage <= 0) return;
+
+  // 从封底返回
+  if (currentPage >= totalPapers) {
+    isFlipping = true;
+    currentPage = totalPapers - 1;
+    // 显示纸页，隐藏封底
+    papers.forEach(p => p.style.display = '');
+    if (backCoverEl) backCoverEl.style.display = 'none';
+    // 翻回最后一张纸
+    const paper = papers[currentPage];
+    paper.classList.add('flipping');
+    paper.classList.remove('flipped');
+    paper.style.zIndex = 9999;
+
+    updateYearNav();
+
+    setTimeout(() => {
+      paper.classList.remove('flipping');
+      const origZ = parseInt(paper.dataset.origZ) || 0;
+      paper.style.zIndex = origZ;
+      updateBookPosition();
+      isFlipping = false;
+    }, 600);
+    return;
+  }
 
   isFlipping = true;
   currentPage--;
@@ -250,12 +287,16 @@ function flipLeft() {
 // 更新可见页面
 // ==============================
 function updateVisiblePages() {
+  // 隐藏封底
+  if (backCoverEl) backCoverEl.style.display = 'none';
+  
   if (papers.length > 0) {
     // 初始状态：封面在右侧，不翻转
     for (let i = 0; i < papers.length; i++) {
       const p = papers[i];
       p.classList.remove('flipped');
       p.classList.remove('flipping');
+      p.style.display = ''; // 确保可见
       const origZ = parseInt(p.dataset.origZ) || 0;
       p.style.zIndex = origZ;
     }
@@ -265,14 +306,30 @@ function updateVisiblePages() {
 }
 
 // ==============================
-// 更新书的位置（封面居中 vs 翻开居中）
+// 更新书的位置（封面居中 vs 翻开居中 vs 封底居中）
 // ==============================
 function updateBookPosition() {
   if (!bookEl) return;
-  if (currentPage > 0) {
-    bookEl.classList.add('open');
-  } else {
+  if (currentPage >= totalPapers) {
+    // 封底: 居中单页
+    bookEl.classList.add('is-back');
     bookEl.classList.remove('open');
+    // 隐藏所有纸页，显示封底
+    papers.forEach(p => p.style.display = 'none');
+    if (backCoverEl) backCoverEl.style.display = 'flex';
+  } else if (currentPage > 0) {
+    // 翻开: 书脊居中
+    bookEl.classList.add('open');
+    bookEl.classList.remove('is-back');
+    // 确保纸页可见，封底隐藏
+    papers.forEach(p => p.style.display = '');
+    if (backCoverEl) backCoverEl.style.display = 'none';
+  } else {
+    // 封面: 居中单页
+    bookEl.classList.remove('open');
+    bookEl.classList.remove('is-back');
+    papers.forEach(p => p.style.display = '');
+    if (backCoverEl) backCoverEl.style.display = 'none';
   }
 }
 
@@ -312,6 +369,7 @@ function updateYearNav() {
 }
 
 function jumpToYear(year) {
+  if (currentPage >= totalPapers) return; // 封底状态不可跳转
   const idx = photoData.findIndex(p => p.date && p.date.startsWith(year));
   if (idx === -1) return;
 
@@ -361,6 +419,16 @@ function jumpToYear(year) {
 }
 
 // ==============================
+// 封底 HTML
+// ==============================
+function makeBackCoverHTML() {
+  return `<div class="book-back-cover-inner">
+    <div class="book-cover-title">📕 THE END</div>
+    <div class="book-cover-sub">TimeFrame · ${new Date().getFullYear()}</div>
+  </div>`;
+}
+
+// ==============================
 // 窗口变化
 // ==============================
 function onResize() {
@@ -393,5 +461,6 @@ export function destroyBook() {
   bookWrapper = null;
   yearNavEl = null;
   coverUrl = null;
+  backCoverEl = null;
   window.removeEventListener('resize', onResize);
 }
