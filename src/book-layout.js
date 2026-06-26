@@ -133,22 +133,7 @@ function buildBookPages(bookEl, data) {
 
   const coverFront = document.createElement('div');
   coverFront.className = 'book-page front';
-
-  const coverIdx = Math.floor(Math.random() * data.length);
-  const coverImg = document.createElement('img');
-  coverImg.src = createBlob(data[coverIdx].file);
-  coverImg.draggable = false;
-  coverFront.appendChild(coverImg);
-
-  const coverTitleEl = document.createElement('div');
-  coverTitleEl.className = 'book-cover-title';
-  coverTitleEl.textContent = '📒 回忆相册';
-  coverFront.appendChild(coverTitleEl);
-
-  const coverSub = document.createElement('div');
-  coverSub.className = 'book-cover-sub';
-  coverSub.textContent = '📷 ' + data.length + ' 张照片';
-  coverFront.appendChild(coverSub);
+  coverFront.innerHTML = makeCoverDesignHTML(data.length);
   coverPaper.appendChild(coverFront);
 
   // 封面背面：显示第一张照片
@@ -420,12 +405,40 @@ function jumpToYear(year) {
 }
 
 // ==============================
+// 封面设计 HTML
+// ==============================
+function makeCoverDesignHTML(count) {
+  return `<div class="book-cover-design">
+    <div class="cover-corner tl"></div>
+    <div class="cover-corner tr"></div>
+    <div class="cover-corner bl"></div>
+    <div class="cover-corner br"></div>
+    <div class="cover-deco-line top"></div>
+    <div class="cover-label">· MEMORIES ·</div>
+    <div class="cover-title-main">回忆相册</div>
+    <div class="cover-divider"></div>
+    <div class="cover-sub">Photo Journal</div>
+    <div class="cover-stats">共 <em>${count}</em> 张照片</div>
+    <div class="cover-deco-line bottom"></div>
+  </div>`;
+}
+
+// ==============================
 // 封底 HTML
 // ==============================
 function makeBackCoverHTML() {
-  return `<div class="book-back-cover-inner">
-    <div class="book-cover-title">📕 THE END</div>
-    <div class="book-cover-sub">TimeFrame · ${new Date().getFullYear()}</div>
+  return `<div class="book-cover-design">
+    <div class="cover-corner tl"></div>
+    <div class="cover-corner tr"></div>
+    <div class="cover-corner bl"></div>
+    <div class="cover-corner br"></div>
+    <div class="cover-deco-line top"></div>
+    <div class="cover-label">· FIN ·</div>
+    <div class="cover-title-main">THE END</div>
+    <div class="cover-divider"></div>
+    <div class="cover-sub">TimeFrame</div>
+    <div class="cover-stats">${new Date().getFullYear()}</div>
+    <div class="cover-deco-line bottom"></div>
   </div>`;
 }
 

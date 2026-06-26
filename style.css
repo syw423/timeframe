@@ -2817,7 +2817,115 @@ body {
   letter-spacing: 1px;
 }
 
-/* 小屏适配 */
+/* 封面/封底设计 - 纯装饰封皮(无照片) */
+.book-cover-design {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 28px;
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* 金色装饰角 */
+.cover-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-color: #c9a95c;
+  border-style: solid;
+}
+.cover-corner.tl { top: 16px; left: 16px; border-width: 2px 0 0 2px; }
+.cover-corner.tr { top: 16px; right: 16px; border-width: 2px 2px 0 0; }
+.cover-corner.bl { bottom: 16px; left: 16px; border-width: 0 0 2px 2px; }
+.cover-corner.br { bottom: 16px; right: 16px; border-width: 0 2px 2px 0; }
+
+/* 装饰横线 */
+.cover-deco-line {
+  width: 160px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c9a95c, transparent);
+}
+.cover-deco-line.top { margin-bottom: 24px; }
+.cover-deco-line.bottom { margin-top: 24px; }
+
+/* · MEMORIES · / · FIN · 标签 */
+.cover-label {
+  font-size: 11px;
+  letter-spacing: 6px;
+  color: #c9a95c;
+  font-family: 'Georgia', serif;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+
+/* 主标题 */
+.cover-title-main {
+  font-size: 34px;
+  font-weight: 700;
+  color: #f5f0e0;
+  font-family: 'Georgia', serif;
+  letter-spacing: 6px;
+  line-height: 1.2;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* 装饰分隔线 */
+.cover-divider {
+  width: 48px;
+  height: 2px;
+  background: #c9a95c;
+  margin-bottom: 12px;
+  position: relative;
+}
+.cover-divider::after {
+  content: '◆';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #c9a95c;
+  font-size: 9px;
+}
+
+/* 副标题 */
+.cover-sub {
+  font-size: 14px;
+  color: rgba(201, 169, 92, 0.65);
+  font-family: 'Georgia', serif;
+  letter-spacing: 5px;
+  font-style: italic;
+  margin-bottom: 18px;
+}
+
+/* 统计 */
+.cover-stats {
+  font-size: 12px;
+  color: rgba(245, 240, 224, 0.45);
+  letter-spacing: 2px;
+}
+.cover-stats em {
+  font-style: normal;
+  color: #c9a95c;
+}
+
+/* 控制 "封面/封底" 模式下的背景 */
+.book.is-back .book-cover-design {
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 45%, #0f3460 100%);
+}
+
+/* (旧封面标题类保留兼容，本版本已不再使用) */
+/* .book-cover-title { ... } */
+
+/* ==============================
+   小屏适配 - 书
+   ============================== */
 @media (max-width: 768px) {
   .book { width: min(85vw, 420px); height: min(50vh, 380px); }
   .book-year-nav { top: 12px; padding: 4px 10px; }
@@ -2826,7 +2934,8 @@ body {
 
 @media (max-width: 480px) {
   .book { width: min(80vw, 320px); height: min(42vh, 320px); margin: 0 16px; }
-  .book-cover-title { font-size: 22px; }
-  .book-cover-title::after { width: 40px; }
-  .book-cover-sub { font-size: 11px; letter-spacing: 4px; }
+  .cover-title-main { font-size: 24px; letter-spacing: 4px; }
+  .cover-label { font-size: 10px; letter-spacing: 4px; }
+  .cover-sub { font-size: 12px; letter-spacing: 3px; }
+  .cover-deco-line { width: 100px; }
 }
