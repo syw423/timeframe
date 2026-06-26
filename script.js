@@ -165,7 +165,6 @@ async function updateHomeStats() {
   if (zonePhotosCount) zonePhotosCount.textContent = allPhotoData.length;
   if (zoneTagsCount) {
     try {
-      const { getAllTags } = await import('./src/db.js');
       const tags = await getAllTags();
       // 缓存标签定义供各处使用
       window.__allTagDefs = tags;
@@ -863,6 +862,12 @@ function addTagBadge(card, photo) {
 }
 
 function clearGalleryRing() {
+  // 清理轮播拖拽事件
+  if (window.__carouselCleanup) {
+    try { window.__carouselCleanup(); } catch (e) { /* ignore */ }
+    window.__carouselCleanup = null;
+  }
+
   // 清理 Three.js 场景
   destroyThreeScene();
 
@@ -1044,7 +1049,6 @@ window.selectTag = function(tagName, returnView) {
  */
 async function reloadPhotoTags() {
   try {
-    const { loadFromIndexedDB } = await import('./src/db.js');
     const loaded = await loadFromIndexedDB();
     // 更新 allPhotoData 中的 tags
     for (const item of loaded) {
@@ -1273,6 +1277,12 @@ function buildCarouselMode(photoData) {
   viewport.addEventListener('mousedown', onStart);
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onEnd);
+
+  // 保存清理函数，供 clearGalleryRing 调用
+  window.__carouselCleanup = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onEnd);
+  };
 
   // 鼠标滚轮水平滚动
   viewport.addEventListener('wheel', (e) => {

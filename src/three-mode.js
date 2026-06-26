@@ -155,8 +155,12 @@ function buildPhotos(photoData) {
     const cardWidth = 1.4;
     const cardHeight = cardWidth / 0.75; // 默认 4:3
 
-    // 等图片加载完获取真实宽高比更新几何体
+    const texture = new THREE.Texture(img);
+    texture.needsUpdate = true;
+
+    // 等图片加载完获取真实宽高比更新几何体 + 更新纹理
     img.onload = () => {
+      texture.needsUpdate = true;
       const aspect = img.naturalWidth / img.naturalHeight;
       const mesh = photoMeshes.find(m => m.userData.url === url);
       if (mesh) {
@@ -168,10 +172,6 @@ function buildPhotos(photoData) {
         mesh.userData.aspect = aspect;
       }
     };
-
-    const texture = new THREE.Texture(img);
-    texture.needsUpdate = true;
-    img.onload = () => { texture.needsUpdate = true; };
 
     const geo = new THREE.PlaneGeometry(cardWidth, cardHeight);
     const mat = new THREE.MeshStandardMaterial({

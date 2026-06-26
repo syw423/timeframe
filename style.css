@@ -36,6 +36,15 @@
   --overlay-glass: rgba(20, 20, 30, 0.85);
   --divider-soft: rgba(255, 255, 255, 0.08);
   --highlight-soft: rgba(255, 255, 255, 0.04);
+  /* 向后兼容旧变量 */
+  --bg-primary: var(--bg);
+  --bg-secondary: var(--bg-2);
+  --bg-glass: var(--glass);
+  --text-primary: var(--text);
+  --text-secondary: var(--text-2);
+  --text-muted: var(--text-3);
+  --accent-hover: var(--accent);
+  --danger-glow: var(--danger-soft);
 }
 
 /* ==============================
@@ -74,10 +83,7 @@
   --overlay-glass: rgba(255, 255, 255, 0.9);
   --divider-soft: rgba(0, 0, 0, 0.08);
   --highlight-soft: rgba(0, 0, 0, 0.04);
-}
-
-/* 向后兼容旧变量 */
-:root {
+  /* 向后兼容旧变量 — 与 dark 一致 */
   --bg-primary: var(--bg);
   --bg-secondary: var(--bg-2);
   --bg-glass: var(--glass);
@@ -899,14 +905,19 @@ body {
 .arrangement-bar {
   display: flex;
   gap: 4px;
-  margin-left: 8px;
+  margin-left: 4px;
   padding: 4px;
+  background: var(--bg-glass);
   border: 1px solid var(--border);
   border-radius: 10px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  align-items: center;
 }
 .arr-btn {
   padding: 6px 12px;
   font-size: 12px;
+  font-weight: 500;
   color: var(--text-2);
   background: transparent;
   border: none;
@@ -1009,43 +1020,6 @@ body {
 
 .carousel-container:active {
   cursor: grabbing;
-}
-
-/* 3D 排列切换栏 */
-.arrangement-bar {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--bg-glass);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  align-items: center;
-  margin-left: 4px;
-}
-
-.arr-btn {
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.arr-btn:hover {
-  background: var(--info-soft);
-  color: var(--accent);
-}
-
-.arr-btn.active {
-  background: var(--accent);
-  color: var(--bg);
-  font-weight: 600;
 }
 
 .carousel-track {
@@ -1647,26 +1621,6 @@ body {
   gap: 10px;
 }
 
-.tag-exit-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 18px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--danger);
-  background: var(--danger-soft);
-  border: 1px solid var(--danger-border);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tag-exit-btn:hover {
-  background: var(--danger-soft-hover);
-  border-color: var(--danger);
-}
-
 .create-tag-btn {
   display: inline-flex;
   align-items: center;
@@ -1744,11 +1698,7 @@ body {
   letter-spacing: 1px;
 }
 
-.tags-grid {
-  display: none; /* 已被 .zone-grid 替代 */
-}
-
-.tag-card {
+.tags-section {
   cursor: pointer;
 }
 
@@ -2528,20 +2478,18 @@ body {
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
+@keyframes tagSuccessPop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
 
 
 /* ============================================================
    响应式
    ============================================================ */
 @media (max-width: 768px) {
-  .welcome-header h1 { font-size: 24px; }
-  .logo-icon { width: 56px; height: 56px; }
-  .import-btn { padding: 12px 28px; font-size: 14px; }
-  .welcome-content { padding: 28px 20px; }
-  
   .top-bar { top: 16px; left: 16px; }
-  .nav-tabs { flex-wrap: wrap; }
-  .nav-tab { padding: 8px 14px; font-size: 12px; }
   .tag-filter-bar { left: 16px; top: 72px; }
   
   #status { font-size: 12px; padding: 8px 18px; bottom: 20px; }
@@ -2564,11 +2512,7 @@ body {
 }
 
 @media (max-width: 480px) {
-  .welcome-header h1 { font-size: 22px; }
-  .welcome-subtitle { font-size: 12px; }
-  
   .top-bar { top: 12px; left: 12px; gap: 6px; }
-  .nav-tab { padding: 6px 12px; font-size: 11px; }
   .tag-filter-bar { left: 12px; top: 68px; }
   
   .date-modal-glass { padding: 20px 16px; border-radius: 20px; }

@@ -22,6 +22,13 @@ let backCoverEl = null; // 封底元素
 // ==============================
 export function renderBook(container, data) {
   if (!container) return;
+
+  // 清理上一次的 blob URLs
+  for (const url of blobUrls) {
+    try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
+  }
+  blobUrls = [];
+
   containerEl = container;
   photoData = data;
   currentPage = 0;
