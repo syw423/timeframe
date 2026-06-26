@@ -783,7 +783,6 @@ body {
   top: 60px; left: 0; right: 0; bottom: 0;
   display: flex; align-items: center; justify-content: center;
 }
-#book-view-container > * { width: 100%; height: 100%; }
 
 /* ==============================
    4. 照片视图（重构）
@@ -2592,213 +2591,262 @@ body {
 /* ============================================================
    翻页书布局 — 纸质书风格
    ============================================================ */
+/* ==============================
+   翻页书 v2 双页布局
+   ============================== */
+
+/* 书本容器（由父 flex 居中） */
 .book-wrapper {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  position: relative;
   perspective: 2000px;
-  overflow: visible;
-  padding: 20px 0;
 }
 
-/* 年份导航 */
-.book-year-nav {
-  position: absolute;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 6px;
-  padding: 5px 12px;
-  background: rgba(245, 239, 230, 0.85);
-  border: 1px solid #d5c8b8;
-  border-radius: 18px;
-  overflow-x: auto;
-  max-width: 85%;
-  scrollbar-width: none;
-  z-index: 100;
-  backdrop-filter: blur(8px);
-}
-
-.book-year-nav::-webkit-scrollbar { display: none; }
-
-.book-year-btn {
-  background: transparent;
-  border: none;
-  border-radius: 12px;
-  padding: 3px 12px;
-  font-size: 13px;
-  color: #7a6a58;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-  font-family: 'Georgia', serif;
-}
-
-.book-year-btn:hover { color: #3d2e1e; background: rgba(201, 181, 155, 0.2); }
-.book-year-btn.active { color: #3d2e1e; background: #c9b59b; font-weight: 600; }
-
-/* 书本体 */
+/* 书本体 - 宽度根据状态自适应，永远居中 */
 .book {
   position: relative;
-  width: min(72vw, 560px);
-  height: min(62vh, 520px);
-  transform-style: preserve-3d;
-  transition: transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
-  background: #fcf8f0;
-  border: 1px solid #d5c8b8;
-  border-left: 5px solid #c9b59b;
-  box-shadow:
-    8px 8px 25px var(--shadow),
-    inset 0 0 40px rgba(170,130,80,0.08);
-  border-radius: 4px 10px 10px 4px;
-}
-
-/* 翻开模式：书脊（左边缘）对齐屏幕中心 */
-.book.open {
-  transform: translateX(50%);
-}
-
-/* 纸张 */
-.book-paper {
-  position: absolute;
-  inset: 0;
-  transform-style: preserve-3d;
-  transform-origin: left center;
-  transition: transform 0.55s cubic-bezier(0.4, 0.0, 0.2, 1);
-  cursor: default;
-  border-radius: 4px 10px 10px 4px;
-  background: #fcf8f0;
-  box-shadow:
-    0 1px 3px var(--shadow),
-    inset 0 0 30px rgba(170,130,80,0.04);
-}
-
-/* 翻转状态 */
-.book-paper.flipped {
-  transform: rotateY(-180deg);
-  z-index: 0 !important;
-}
-
-/* 翻转过渡中 */
-.book-paper.flipping {
-  z-index: 9999 !important;
-  box-shadow: 0 0 20px var(--shadow);
-}
-
-/* 页面 */
-.book-page {
-  position: absolute;
-  inset: 0;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  width: 300px;            /* 封面/封底: 单页 */
+  max-width: 90vw;
+  height: 400px;
+  max-height: 60vh;
+  flex-shrink: 0;
+  transition: width 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
   overflow: hidden;
-  border-radius: inherit;
+}
+
+/* 翻开状态: 双页 */
+.book.is-open {
+  width: 600px;
+}
+
+/* ==============================
+   v4: 三个独立元素 (封面 / 翻开 / 封底)
+   默认全部隐藏，由状态类控制
+   ============================== */
+.book-cover-page,
+.book-open-pages,
+.book-back-cover-page {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+/* 翻开容器: flex 双列 */
+.book-open-pages {
+  flex-direction: row;
+}
+
+/* 单张照片页面 */
+.book-photo-page {
+  position: relative;
+  flex: 1;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
-.book-page.front {
-  border-radius: 4px 10px 10px 4px;
+.book-photo-page + .book-photo-page {
+  border-left: 1px solid var(--border);
 }
 
-.book-page.back {
-  transform: rotateY(180deg);
-  border-radius: 10px 4px 4px 10px;
+/* ==============================
+   状态切换
+   ============================== */
+/* 封面状态: 只显示封面 */
+.book.is-cover .book-cover-page { display: block; }
+.book.is-cover .book-open-pages,
+.book.is-cover .book-back-cover-page { display: none; }
+
+/* 翻开状态: 只显示双页 */
+.book.is-open .book-open-pages { display: flex; }
+.book.is-open .book-cover-page,
+.book.is-open .book-back-cover-page { display: none; }
+
+/* 封底状态: 只显示封底 */
+.book.is-back .book-back-cover-page { display: block; }
+.book.is-back .book-cover-page,
+.book.is-back .book-open-pages { display: none; }
+
+/* ==============================
+   照片框
+   ============================== */
+.book-photo-frame {
+  position: absolute;
+  top: 6%;
+  left: 5%;
+  right: 5%;
+  bottom: 16%;
+  background: var(--bg-3, #1a1a24);
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.1),
+    0 2px 8px rgba(0,0,0,0.08);
 }
 
-/* 照片 */
-.book-page img {
+.book-photo-frame img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-/* 封面标题 */
-.book-cover-title {
+/* 照片元数据 */
+.book-photo-meta {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 36px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.92);
-  text-shadow:
-    0 2px 12px var(--shadow),
-    2px 2px 0 var(--shadow);
-  letter-spacing: 3px;
-  text-align: center;
-  line-height: 1.3;
+  bottom: 4%;
+  left: 5%;
+  right: 5%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.book-photo-date {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--page-text-soft, #8a7a68);
   font-family: 'Georgia', serif;
-  pointer-events: none;
+}
+
+.book-photo-num {
+  font-size: 10px;
+  color: var(--page-text-soft, #8a7a68);
+  opacity: 0.6;
+  letter-spacing: 0.1em;
+  font-family: 'Georgia', serif;
+}
+
+/* ==============================
+   封面 / 封底
+   ============================== */
+.book-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(255,255,255,0.05) 0%,
+      transparent 60%),
+    var(--page-paper, #fcf8f0);
+  box-shadow: inset 0 0 60px var(--page-paper-shadow, rgba(170,130,80,0.06));
+  text-align: center;
+  padding: 20px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+/* 封面角花 */
+.book-cover-corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: var(--page-text-soft, #a09080);
+  opacity: 0.4;
+}
+.book-cover-corner.tl { top: 16px; left: 16px; border-top: 1px solid; border-left: 1px solid; }
+.book-cover-corner.tr { top: 16px; right: 16px; border-top: 1px solid; border-right: 1px solid; }
+.book-cover-corner.bl { bottom: 16px; left: 16px; border-bottom: 1px solid; border-left: 1px solid; }
+.book-cover-corner.br { bottom: 16px; right: 16px; border-bottom: 1px solid; border-right: 1px solid; }
+
+.book-cover-deco {
+  font-size: 11px;
+  color: var(--page-text-soft, #a09080);
+  letter-spacing: 5px;
+  margin-bottom: 12px;
+  opacity: 0.7;
+}
+
+.book-cover-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--page-text, #3d2e1e);
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  position: static;
+  transform: none;
+  text-shadow: none;
+  pointer-events: auto;
 }
 
 .book-cover-title::after {
-  content: '';
-  display: block;
-  width: 60px;
-  height: 2px;
-  background: rgba(255,255,255,0.5);
-  margin: 12px auto 0;
+  display: none;
 }
 
-.book-cover-sub {
-  position: absolute;
-  bottom: 20%;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 14px;
-  color: rgba(255,255,255,0.7);
-  letter-spacing: 6px;
-  font-family: 'Georgia', serif;
-  white-space: nowrap;
+.book-cover-rule {
+  width: 50px;
+  height: 1px;
+  background: var(--page-text-soft, #a09080);
+  opacity: 0.3;
+  margin-bottom: 10px;
 }
 
-/* 背景投影 */
+.book-cover-year {
+  font-size: 13px;
+  color: var(--page-text-soft, #a09080);
+  letter-spacing: 2px;
+  font-style: italic;
+}
+
+.book-cover-stat {
+  font-size: 12px;
+  color: var(--page-text-soft, #a09080);
+  letter-spacing: 1px;
+  margin-top: 16px;
+}
+.book-cover-stat em {
+  font-style: italic;
+  font-weight: 600;
+}
+
+/* ==============================
+   主题变量: 纸张颜色
+   ============================== */
+:root, [data-theme="dark"] {
+  --page-paper: #f5efe2;
+  --page-paper-shadow: rgba(170,130,80,0.06);
+  --page-text: #3d2e1e;
+  --page-text-soft: #8a7a68;
+  --page-spine: rgba(0,0,0,0.12);
+}
+
+[data-theme="light"] {
+  --page-paper: #fcf8f0;
+  --page-paper-shadow: rgba(170,130,80,0.04);
+  --page-text: #3d2e1e;
+  --page-text-soft: #8a7a68;
+  --page-spine: rgba(0,0,0,0.08);
+}
+
+/* ==============================
+   桌面投影
+   ============================== */
 .book-wrapper::before {
   content: '';
   position: absolute;
-  left: 10%;
-  right: 10%;
-  bottom: -10px;
+  left: 8%;
+  right: 8%;
+  bottom: -12px;
   height: 30px;
-  background: radial-gradient(ellipse at 50% 0%, var(--shadow) 0%, transparent 70%);
+  background: radial-gradient(ellipse at center, var(--shadow) 0%, transparent 70%);
+  filter: blur(8px);
   pointer-events: none;
   z-index: 0;
+  opacity: 0.4;
 }
 
-/* 日期标签 */
-.book-page-label {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: rgba(255,255,255,0.85);
-  background: rgba(61,46,30,0.55);
-  padding: 3px 14px;
-  border-radius: 10px;
-  backdrop-filter: blur(4px);
-  white-space: nowrap;
-  font-family: 'Georgia', serif;
-  letter-spacing: 1px;
-}
-
-/* 小屏适配 */
+/* ==============================
+   小屏适配
+   ============================== */
 @media (max-width: 768px) {
-  .book { width: min(85vw, 420px); height: min(50vh, 380px); }
-  .book-year-nav { top: 12px; padding: 4px 10px; }
-  .book-year-btn { font-size: 12px; padding: 2px 10px; }
+  .book { width: 85vw; max-width: 480px; height: 50vh; max-height: 340px; }
 }
 
 @media (max-width: 480px) {
-  .book { width: min(80vw, 320px); height: min(42vh, 320px); margin: 0 16px; }
-  .book-cover-title { font-size: 22px; }
-  .book-cover-title::after { width: 40px; }
-  .book-cover-sub { font-size: 11px; letter-spacing: 4px; }
+  .book { width: 88vw; max-width: 360px; height: 44vh; max-height: 260px; }
+  .book-cover-title { font-size: 18px; }
+  .book-cover-deco { font-size: 9px; }
 }
