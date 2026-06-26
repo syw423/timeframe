@@ -212,6 +212,17 @@ function flipRight() {
   if (isFlipping) return;
   if (currentPage >= totalPapers) return;
 
+  // 最后一张照片在右边的页面上 → 直接合上封底(不翻纸)
+  if (currentPage === totalPapers - 1) {
+    isFlipping = true;
+    currentPage = totalPapers; // 切换到封底状态
+    updateBookPosition();      // 隐藏纸页、显示封底、去掉open
+    setTimeout(() => {
+      isFlipping = false;
+    }, 400);
+    return;
+  }
+
   isFlipping = true;
   const paper = papers[currentPage];
   paper.style.zIndex = 9999;
@@ -239,28 +250,18 @@ function flipLeft() {
   if (isFlipping) return;
   if (currentPage <= 0) return;
 
-  // 从封底返回
+  // 从封底返回(直接回到最后一张照片在右侧的展开状态)
   if (currentPage >= totalPapers) {
     isFlipping = true;
     currentPage = totalPapers - 1;
     // 显示纸页，隐藏封底
     papers.forEach(p => p.style.display = '');
     if (backCoverEl) backCoverEl.style.display = 'none';
-    // 翻回最后一张纸
-    const paper = papers[currentPage];
-    paper.classList.add('flipping');
-    paper.classList.remove('flipped');
-    paper.style.zIndex = 9999;
-
-    updateYearNav();
+    updateBookPosition(); // 加回open类
 
     setTimeout(() => {
-      paper.classList.remove('flipping');
-      const origZ = parseInt(paper.dataset.origZ) || 0;
-      paper.style.zIndex = origZ;
-      updateBookPosition();
       isFlipping = false;
-    }, 600);
+    }, 400);
     return;
   }
 
