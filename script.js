@@ -699,6 +699,16 @@ async function selectDate(date) {
     bindGalleryTagEvents(); // fallback
   }
 
+  // 布局切换淡入动画
+  const gallery = document.getElementById('gallery-3d');
+  if (gallery) {
+    gallery.style.opacity = '0';
+    void gallery.offsetHeight; // force reflow
+    gallery.style.transition = 'opacity 0.25s ease';
+    gallery.style.opacity = '1';
+    setTimeout(() => { gallery.style.transition = ''; }, 300);
+  }
+
   setText(statusDiv, currentTag
     ? `🏷️ 标签「${currentTag}」- ${photos.length} 张照片`
     : date === 'all'
@@ -1238,12 +1248,14 @@ function buildCarouselMode(photoData) {
   let isDrag = false;
   let startX = 0;
   let scrollLeft = 0;
+  let velHistory = [];
 
   const onStart = (e) => {
     if (e.target.closest('.carousel-card')) {
       isDrag = true;
       startX = e.clientX;
       scrollLeft = parseFloat(strip.dataset.x) || 0;
+      velHistory.length = 0;
       viewport.style.cursor = 'grabbing';
     }
   };
@@ -1256,32 +1268,83 @@ function buildCarouselMode(photoData) {
     let newX = Math.max(-maxScroll, Math.min(0, scrollLeft + delta));
     strip.dataset.x = newX;
     strip.style.transform = `translateX(${newX}px)`;
+    velHistory.push({ x: newX, time: Date.now() });
+    if (velHistory.length > 10) velHistory.shift();
+    updateCarouselHighlight(layout, viewport, strip);
   };
 
   const onEnd = () => {
     if (!isDrag) return;
     isDrag = false;
     viewport.style.cursor = 'grab';
-    // 对齐到最近卡片
+
     const x = parseFloat(strip.dataset.x) || 0;
     const cellW = layout.cardWidth + layout.gap;
-    const snapped = Math.round(-x / cellW) * cellW;
+
+    // 计算惯性速度
+    let velocity = 0;
+    if (velHistory.length >= 3) {
+      const first = velHistory[0];
+      const last = velHistory[velHistory.length - 1];
+      const dt = last.time - first.time;
+      if (dt > 0) velocity = (last.x - first.x) / dt; // px/ms
+    }
+    velHistory.length = 0;
+
+    // 有惯性时滑过额外卡片再回弹对齐
+    const absVel = Math.abs(velocity);
+    let targetSnap;
+    if (absVel > 0.4) {
+      const momentumCards = Math.round(velocity * 120 / cellW);
+      const clamped = Math.max(-3, Math.min(3, momentumCards));
+      const projected = Math.round(-x / cellW) + clamped;
+      targetSnap = projected * cellW;
+    } else {
+      targetSnap = Math.round(-x / cellW) * cellW;
+    }
+
     const maxSnap = Math.max(0, layout.totalWidth - viewport.clientWidth);
-    const finalX = Math.max(-maxSnap, Math.min(0, -snapped));
+    const finalX = Math.max(-maxSnap, Math.min(0, -targetSnap));
     strip.dataset.x = finalX;
+    strip.style.transition = absVel > 0.4
+      ? 'transform 0.45s cubic-bezier(0.05, 0.7, 0.1, 1.0)'
+      : 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
     strip.style.transform = `translateX(${finalX}px)`;
-    strip.style.transition = 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
-    setTimeout(() => { strip.style.transition = ''; }, 300);
+
+    const onTransEnd = () => {
+      strip.style.transition = '';
+      updateCarouselHighlight(layout, viewport, strip);
+    };
+    viewport.addEventListener('transitionend', onTransEnd, { once: true });
   };
 
   viewport.addEventListener('mousedown', onStart);
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onEnd);
 
+  // 键盘 ← → 导航（全局监听，轮播激活时响应）
+  const onKeyDown = (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const container = document.getElementById('gallery-3d');
+    if (!container || !container.classList.contains('carousel-mode')) return;
+    e.preventDefault();
+    const cellW = layout.cardWidth + layout.gap;
+    const curX = parseFloat(strip.dataset.x) || 0;
+    const step = e.key === 'ArrowRight' ? -cellW : cellW;
+    const maxScroll = Math.max(0, layout.totalWidth - viewport.clientWidth);
+    const newX = Math.max(-maxScroll, Math.min(0, curX + step));
+    strip.dataset.x = newX;
+    strip.style.transition = 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1)';
+    strip.style.transform = `translateX(${newX}px)`;
+    setTimeout(() => { strip.style.transition = ''; updateCarouselHighlight(layout, viewport, strip); }, 300);
+  };
+  document.addEventListener('keydown', onKeyDown);
+
   // 保存清理函数，供 clearGalleryRing 调用
   window.__carouselCleanup = () => {
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onEnd);
+    document.removeEventListener('keydown', onKeyDown);
   };
 
   // 鼠标滚轮水平滚动
@@ -1294,10 +1357,40 @@ function buildCarouselMode(photoData) {
     strip.dataset.x = newX;
     strip.style.transform = `translateX(${newX}px)`;
     strip.style.transition = 'transform 0.15s ease';
-    setTimeout(() => { strip.style.transition = ''; }, 150);
+    setTimeout(() => { strip.style.transition = ''; updateCarouselHighlight(layout, viewport, strip); }, 150);
   }, { passive: false });
 
   viewport.style.cursor = 'grab';
+  updateCarouselHighlight(layout, viewport, strip); // 首次高亮
+}
+
+/** 更新轮播高亮：中心卡片突出，两侧暗化 */
+function updateCarouselHighlight(layout, viewport, strip) {
+  const cards = strip.querySelectorAll('.carousel-card');
+  if (!cards.length) return;
+  const viewportW = viewport.clientWidth;
+  const x = parseFloat(strip.dataset.x) || 0;
+  const centerX = viewportW / 2 - x; // 视口中心在 strip 坐标系中的位置
+  const cellW = layout.cardWidth + layout.gap;
+
+  let minDist = Infinity;
+  let centerIdx = 0;
+  cards.forEach((card, i) => {
+    const cardCenter = i * cellW + layout.gap + layout.cardWidth / 2;
+    const dist = Math.abs(cardCenter - centerX);
+    if (dist < minDist) { minDist = dist; centerIdx = i; }
+  });
+
+  cards.forEach((card, i) => {
+    const dist = Math.abs(i - centerIdx);
+    if (dist === 0) {
+      card.classList.add('carousel-card-center');
+      card.classList.remove('carousel-card-side');
+    } else {
+      card.classList.add('carousel-card-side');
+      card.classList.remove('carousel-card-center');
+    }
+  });
 }
 
 // ==============================

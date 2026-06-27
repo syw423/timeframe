@@ -24,9 +24,10 @@ export function initThreeScene(container, photoData) {
   if (!container) return;
   containerEl = container;
 
-  // Scene
+  // Scene — 背景色跟随 CSS 主题
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0d1117);
+  const cssBg = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+  scene.background = new THREE.Color(cssBg || '#0a0a0f');
 
   // Camera
   const w = container.clientWidth || window.innerWidth;
@@ -85,25 +86,40 @@ export function initThreeScene(container, photoData) {
     autoRotateActive = false;
   });
   controls.addEventListener('end', () => {
-    // 1秒后恢复自动旋转
+    // 5秒后恢复自动旋转
     setTimeout(() => {
       controls.autoRotate = true;
       autoRotateActive = true;
-    }, 1000);
+    }, 5000);
   });
 
   // 渲染循环
   startLoop();
+
+  // 监听主题切换，自动更新背景色
+  const themeObserver = new MutationObserver(() => {
+    if (!scene) return;
+    const newBg = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+    if (newBg) scene.background = new THREE.Color(newBg);
+  });
+  themeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+  // 存引用以便销毁时断开
+  window.__threeThemeObserver = themeObserver;
 }
 
 // ==============================
-// 切换排列
+// 切换排列（带动画过渡）
 // ==============================
 export function switchArrangement(type) {
   if (!photoMeshes.length) return;
   if (!ARRANGEMENTS.includes(type)) return;
   currentArrangement = type;
 
+  // 保存当前位置/旋转
+  const startPos = photoMeshes.map(m => m.position.clone());
+  const startQuat = photoMeshes.map(m => m.quaternion.clone());
+
+  // 计算目标位置
   switch (type) {
     case 'sphere': arrangeSphere(); break;
     case 'helix': arrangeHelix(); break;
@@ -111,12 +127,47 @@ export function switchArrangement(type) {
     case 'wave': arrangeWave(); break;
   }
 
+  // 保存目标位置/旋转
+  const endPos = photoMeshes.map(m => m.position.clone());
+  const endQuat = photoMeshes.map(m => m.quaternion.clone());
+
+  // 恢复到起始位置，播放过渡动画
+  photoMeshes.forEach((m, i) => {
+    m.position.copy(startPos[i]);
+    m.quaternion.copy(startQuat[i]);
+  });
+  animateArrangement(endPos, endQuat);
+
   // 重设控制器目标到中心
   controls.target.set(0, 0, 0);
   controls.update();
 }
 
 export { ARRANGEMENTS };
+
+/** 平滑过渡到目标排列 */
+function animateArrangement(endPositions, endQuaternions) {
+  const duration = 600;
+  const startTime = performance.now();
+  const startPos = photoMeshes.map(m => m.position.clone());
+  const startQuat = photoMeshes.map(m => m.quaternion.clone());
+
+  function tick() {
+    const elapsed = performance.now() - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+
+    photoMeshes.forEach((mesh, i) => {
+      mesh.position.lerpVectors(startPos[i], endPositions[i], ease);
+      if (startQuat[i] && endQuaternions[i]) {
+        mesh.quaternion.slerpQuaternions(startQuat[i], endQuaternions[i], ease);
+      }
+    });
+
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  tick();
+}
 
 // ==============================
 // 构建照片 Mesh
@@ -393,6 +444,12 @@ export function destroyThreeScene() {
   camera = null;
   containerEl = null;
   currentArrangement = 'sphere';
+
+  // 断开主题监听
+  if (window.__threeThemeObserver) {
+    window.__threeThemeObserver.disconnect();
+    window.__threeThemeObserver = null;
+  }
 }
 
 // ==============================

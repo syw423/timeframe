@@ -1035,8 +1035,20 @@ body {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 32px var(--shadow);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, filter 0.3s ease, opacity 0.3s ease;
   cursor: pointer;
+}
+
+/* 轮播中心卡片突出 */
+.carousel-card-center {
+  transform: scale(1.08) !important;
+  box-shadow: 0 12px 40px var(--shadow) !important;
+  z-index: 2;
+  position: relative;
+}
+.carousel-card-side {
+  filter: brightness(0.75) !important;
+  transform: scale(0.95) !important;
 }
 
 .carousel-viewport {
@@ -2606,6 +2618,20 @@ body {
   transform: translateX(50%);
 }
 
+/* 翻开时书脊效果 */
+.book.open::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  background: linear-gradient(to right, rgba(170,130,80,0.15), transparent);
+  border-radius: 4px 0 0 4px;
+  z-index: 2;
+  pointer-events: none;
+}
+
 /* 封底模式：居中单页 */
 .book.is-back {
   transform: translateX(0);
@@ -2658,7 +2684,20 @@ body {
 /* 翻转过渡中 */
 .book-paper.flipping {
   z-index: 9999 !important;
-  box-shadow: 0 0 20px var(--shadow);
+  box-shadow:
+    0 0 20px var(--shadow),
+    -4px 0 12px rgba(0,0,0,0.12);
+}
+
+/* 翻转页边缘阴影渐变 */
+.book-paper.flipping::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to left, rgba(0,0,0,0.06) 0%, transparent 30%);
+  pointer-events: none;
+  z-index: 3;
 }
 
 /* 页面 */

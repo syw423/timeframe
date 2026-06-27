@@ -75,7 +75,37 @@ export function renderBook(container, data) {
   // 翻页点击：检测点击位置在左页还是右页
   bookWrapper.addEventListener('click', onWrapperClick);
 
+  // 翻页触摸滑动
+  let touchStartX = 0;
+  let touchStartY = 0;
+  bookWrapper.addEventListener('touchstart', (e) => {
+    if (e.target.closest('.book-year-nav, .book-year-btn')) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  bookWrapper.addEventListener('touchend', (e) => {
+    if (isFlipping) return;
+    if (!bookEl) return;
+    if (touchStartX === 0) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    // 水平滑动距离 > 40px 且 > 垂直滑动距离，判定为翻页手势
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) {
+        // 左滑 = 翻到下一页（右翻）
+        if (currentPage === 0 || currentPage < totalPapers) flipRight();
+      } else {
+        // 右滑 = 翻到上一页（左翻）
+        if (currentPage > 0) flipLeft();
+      }
+    }
+    touchStartX = 0;
+  }, { passive: true });
+
   container.appendChild(bookWrapper);
+
+  // 键盘翻页
+  document.addEventListener('keydown', onKeyDown);
 
   // 窗口变化
   window.addEventListener('resize', onResize);
@@ -117,6 +147,14 @@ function onWrapperClick(e) {
       flipRight();
     }
   }
+}
+
+/** 键盘翻页 ← → */
+function onKeyDown(e) {
+  if (isFlipping) return;
+  if (!bookEl) return;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); flipLeft(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); flipRight(); }
 }
 
 // ==============================
@@ -496,6 +534,8 @@ export function destroyBook() {
   if (bookWrapper) {
     bookWrapper.removeEventListener('click', onWrapperClick);
   }
+  document.removeEventListener('keydown', onKeyDown);
+  window.removeEventListener('resize', onResize);
   papers = [];
   photoData = [];
   currentPage = 0;
