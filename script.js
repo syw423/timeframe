@@ -118,6 +118,13 @@ function showPage(pageEl) {
   if (innerBookshelfPage) innerBookshelfPage.style.display = 'none';
   if (bookViewPage) bookViewPage.style.display = 'none';
   if (pageEl) pageEl.style.display = '';
+
+  // 保存当前页面状态到 sessionStorage（刷新后恢复）
+  if (pageEl) {
+    sessionStorage.setItem('__timeframe_page', pageEl.id);
+    sessionStorage.setItem('__timeframe_layout', currentLayout || 'grid');
+    sessionStorage.setItem('__timeframe_date', currentDate || 'all');
+  }
 }
 function showCover() {
   showPage(coverPage);
@@ -919,6 +926,14 @@ function buildGridMode(photoData) {
   // 计算布局参数
   const vw = container.clientWidth || window.innerWidth;
   const vh = container.clientHeight || window.innerHeight;
+
+  // 如果容器不可见，等待下一帧再重试
+  if (vw <= 0 || vh <= 0) {
+    console.warn('[TimeFrame] grid 容器尺寸为 0，延迟一帧重试');
+    requestAnimationFrame(() => { buildGridMode(photoData); });
+    return;
+  }
+
   const layout = calculateGridLayout(total, vw, vh);
 
   for (let i = 0; i < total; i++) {
@@ -930,6 +945,7 @@ function buildGridMode(photoData) {
     card.className = 'grid-card';
     card.style.width = layout.cardWidth + 'px';
     card.style.height = layout.cardHeight + 'px';
+    card.style.animationDelay = (i * 30) + 'ms';
     card.dataset.date = date;
     card.dataset.filename = filename;
     card.dataset.note = note || '';
@@ -1726,10 +1742,32 @@ async function initFromCache() {
     topBar?.classList.add('visible');
     addClass(pickerAll, 'active');
     rebuildAvailableSet();
+    // 刷新后恢复上一次页面状态（必须在 selectDate 之前读取，避免被覆盖）
+    const savedPage = sessionStorage.getItem('__timeframe_page');
+    const savedLayout = sessionStorage.getItem('__timeframe_layout');
+    const savedDate = sessionStorage.getItem('__timeframe_date');
+    console.log('[TimeFrame] 🔄 sessionStorage:', { savedPage, savedLayout, savedDate });
+
     await selectDate('all');
 
     console.log('[TimeFrame] ✅ 已从缓存恢复 ' + allPhotoData.length + ' 张照片');
     console.log('[TimeFrame] 📊 currentDate =', currentDate, '| 首张照片:', allPhotoData[0]?.filename);
+
+    // 应用保存的状态
+    if (savedPage) {
+      const target = document.getElementById(savedPage);
+      if (target && target !== photosPage) {
+        showPage(target);
+        if (savedPage === 'bookshelf-page') buildOuterShelf();
+      } else if (target === photosPage) {
+        currentLayout = savedLayout || 'grid';
+        if (savedLayout === 'three' && arrangementBar) arrangementBar.style.display = '';
+        showPage(target);
+        requestAnimationFrame(() => {
+          selectDate(savedDate || 'all').catch(() => {});
+        });
+      }
+    }
   } catch (e) {
     console.warn('[TimeFrame] 缓存加载失败:', e);
   }
@@ -1973,9 +2011,13 @@ async function buildInnerShelf(yearName) {
 
   const html = months.map(t => {
     const displayName = t.name.replace(/\d{4}年/, ''); // "2026年3月" → "3月"
-    return makeBook(displayName, t.count || 0, {
-      action: `view-tag:${t.name}`
-    });
+    // 月份用横向标签，不用 makeBook（避免竖排文字）
+    return `
+      <div class="shelf-month" data-action="view-tag:${t.name}">
+        <span class="month-label">${displayName}</span>
+        <span class="month-count">${t.count || 0}</span>
+      </div>
+    `;
   }).join('');
 
   const totalMonthPhotos = months.reduce((s, t) => s + (t.count || 0), 0);
@@ -1990,7 +2032,7 @@ async function buildInnerShelf(yearName) {
   `;
 
   container.onclick = (e) => {
-    const bookEl = e.target.closest('.shelf-book');
+    const bookEl = e.target.closest('.shelf-book') || e.target.closest('.shelf-month');
     if (!bookEl) return;
     const action = bookEl.dataset.action;
     if (!action) return;

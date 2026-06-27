@@ -13,6 +13,7 @@ let autoRotateActive = false;
 let animId = null;
 let containerEl = null;
 let currentArrangement = 'sphere';
+let raycaster, mouse, hoveredGroup;
 
 // 排列类型
 const ARRANGEMENTS = ['sphere', 'helix', 'cube', 'wave'];
@@ -56,17 +57,13 @@ export function initThreeScene(container, photoData) {
   autoRotateActive = true;
   controls.update();
 
-  // 环境光
-  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  // 灯光（中性柔和，不扭曲照片原色）
+  const ambient = new THREE.AmbientLight(0xffffff, 0.8);
   scene.add(ambient);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-  dirLight.position.set(5, 10, 7);
-  scene.add(dirLight);
-
-  const backLight = new THREE.DirectionalLight(0x8888ff, 0.3);
-  backLight.position.set(-3, 0, -5);
-  scene.add(backLight);
+  const softLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  softLight.position.set(3, 6, 5);
+  scene.add(softLight);
 
   // 窗口变化
   window.addEventListener('resize', onResize);
@@ -79,6 +76,17 @@ export function initThreeScene(container, photoData) {
 
   // 默认排列
   arrangeSphere();
+
+  // 鼠标追踪（用于悬停高亮）
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+  hoveredGroup = null;
+
+  renderer.domElement.addEventListener('mousemove', (e) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  });
 
   // 用户拖拽时暂停自动旋转
   controls.addEventListener('start', () => {
@@ -170,15 +178,23 @@ function animateArrangement(endPositions, endQuaternions) {
 }
 
 // ==============================
-// 构建照片 Mesh
+// 构建照片 Mesh + 相框
 // ==============================
+function createPlaceholderTexture() {
+  const c = document.createElement('canvas');
+  c.width = 2; c.height = 2;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#e8e0d0';
+  ctx.fillRect(0, 0, 2, 2);
+  return new THREE.CanvasTexture(c);
+}
+
 function buildPhotos(photoData) {
   // 清理旧数据
   for (const url of photoBlobUrls) { URL.revokeObjectURL(url); }
   photoBlobUrls = [];
 
   // 清理旧 mesh
-  // 清理粒子
   if (particles) {
     scene?.remove(particles);
     particles.geometry?.dispose();
@@ -186,57 +202,108 @@ function buildPhotos(photoData) {
     particles = null;
   }
 
-  for (const mesh of photoMeshes) {
-    scene.remove(mesh);
-    if (mesh.material) {
-      if (mesh.material.map) mesh.material.map.dispose();
-      mesh.material.dispose();
-    }
-    if (mesh.geometry) mesh.geometry.dispose();
+  for (const group of photoMeshes) {
+    scene.remove(group);
+    group.traverse((child) => {
+      if (child.isMesh) {
+        if (child.material) {
+          if (child.material.map) child.material.map.dispose();
+          child.material.dispose();
+        }
+        if (child.geometry) child.geometry.dispose();
+      }
+    });
   }
   photoMeshes = [];
+
+  const placeholderTex = createPlaceholderTexture();
+  photoBlobUrls = [];
 
   for (const data of photoData) {
     const url = URL.createObjectURL(data.file);
     photoBlobUrls.push(url);
 
-    const img = new Image();
-    img.src = url;
+    const cardW = 1.4;
+    const cardH = 1.87; // 默认 4:3 比例
 
-    const cardWidth = 1.4;
-    const cardHeight = cardWidth / 0.75; // 默认 4:3
+    const group = new THREE.Group();
+    group.userData = { url, isPhoto: true, loaded: false };
 
-    const texture = new THREE.Texture(img);
-    texture.needsUpdate = true;
-
-    // 等图片加载完获取真实宽高比更新几何体 + 更新纹理
-    img.onload = () => {
-      texture.needsUpdate = true;
-      const aspect = img.naturalWidth / img.naturalHeight;
-      const mesh = photoMeshes.find(m => m.userData.url === url);
-      if (mesh) {
-        const w = aspect > 1 ? 1.4 : 1.4 * aspect;
-        const h = aspect > 1 ? 1.4 / aspect : 1.4;
-        const geo = new THREE.PlaneGeometry(w, h);
-        mesh.geometry.dispose();
-        mesh.geometry = geo;
-        mesh.userData.aspect = aspect;
-      }
-    };
-
-    const geo = new THREE.PlaneGeometry(cardWidth, cardHeight);
-    const mat = new THREE.MeshStandardMaterial({
-      map: texture,
+    // --- 白色相框 ---
+    const fw = cardW + 0.1;
+    const fh = cardH + 0.1;
+    const frameGeo = new THREE.PlaneGeometry(fw, fh);
+    const frameMat = new THREE.MeshStandardMaterial({
+      color: 0xf5f0e8,
+      roughness: 0.6,
+      metalness: 0.0,
       side: THREE.DoubleSide,
-      roughness: 0.4,
-      metalness: 0.05,
-      transparent: true,
     });
+    const frameMesh = new THREE.Mesh(frameGeo, frameMat);
+    frameMesh.raycast = () => {};
+    group.add(frameMesh);
 
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.userData = { url, aspect: 0.75 };
-    scene.add(mesh);
-    photoMeshes.push(mesh);
+    // --- 正面照片 ---
+    const photoGeo = new THREE.PlaneGeometry(cardW, cardH);
+    const photoMat = new THREE.MeshStandardMaterial({
+      map: placeholderTex,
+      roughness: 0.3,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    });
+    const photoMesh = new THREE.Mesh(photoGeo, photoMat);
+    photoMesh.position.z = 0.002;
+    group.add(photoMesh);
+
+    // --- 背面照片（镜像，从外侧看也是图） ---
+    const backMat = new THREE.MeshStandardMaterial({
+      map: placeholderTex,
+      roughness: 0.3,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    });
+    const backMesh = new THREE.Mesh(photoGeo.clone(), backMat);
+    backMesh.position.z = -0.002;
+    backMesh.scale.x = -1; // 水平镜像，背面看文字不反
+    group.add(backMesh);
+
+    scene.add(group);
+    photoMeshes.push(group);
+
+    // 异步加载真实图片
+    const img = new Image();
+    img.onload = () => {
+      const aspect = img.naturalWidth / img.naturalHeight;
+      let w, h;
+      if (aspect > 1) { w = 1.4; h = 1.4 / aspect; }
+      else { w = 1.4 * aspect; h = 1.4; }
+
+      // 更新相框
+      frameMesh.geometry.dispose();
+      frameMesh.geometry = new THREE.PlaneGeometry(w + 0.1, h + 0.1);
+
+      // 更新正面照片
+      photoMesh.geometry.dispose();
+      photoMesh.geometry = new THREE.PlaneGeometry(w, h);
+      const tex = new THREE.Texture(img);
+      tex.needsUpdate = true;
+      photoMat.map = tex;
+      photoMat.needsUpdate = true;
+
+      // 更新背面照片（宽度为负数需要 clone 新几何体）
+      backMesh.geometry.dispose();
+      const backGeo = new THREE.PlaneGeometry(w, h);
+      backMesh.geometry = backGeo;
+      backMesh.scale.x = -1;
+      const backTex = new THREE.Texture(img);
+      backTex.needsUpdate = true;
+      backMat.map = backTex;
+      backMat.needsUpdate = true;
+
+      group.userData.loaded = true;
+    };
+    img.onerror = () => { group.userData.loaded = true; };
+    img.src = url;
   }
 }
 
@@ -391,6 +458,37 @@ function startLoop() {
       particles.rotation.x = Math.sin(time * 0.5) * 0.02;
     } else if (particles) {
       particles.rotation.y += 0.0003;
+    }
+
+    // 悬停高亮：鼠标指向照片时放大 + 提亮
+    if (raycaster && mouse && renderer) {
+      raycaster.setFromCamera(mouse, camera);
+      // 收集所有 photoMesh 子节点（排除相框）
+      const targets = [];
+      for (const g of photoMeshes) {
+        g.children.forEach(child => {
+          if (child.isMesh && child.raycast !== (() => {})) targets.push(child);
+        });
+      }
+      const intersects = raycaster.intersectObjects(targets);
+
+      let hitGroup = null;
+      if (intersects.length > 0) {
+        const obj = intersects[0].object;
+        hitGroup = obj.parent;
+      }
+
+      if (hitGroup && hitGroup !== hoveredGroup) {
+        // 移除旧高亮
+        if (hoveredGroup) hoveredGroup.scale.set(1, 1, 1);
+        hoveredGroup = hitGroup;
+        hoveredGroup.scale.set(1.12, 1.12, 1.12);
+        renderer.domElement.style.cursor = 'pointer';
+      } else if (!hitGroup && hoveredGroup) {
+        hoveredGroup.scale.set(1, 1, 1);
+        hoveredGroup = null;
+        renderer.domElement.style.cursor = 'default';
+      }
     }
 
     renderer.render(scene, camera);
